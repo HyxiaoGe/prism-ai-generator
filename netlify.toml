@@ -1,0 +1,31 @@
+[build]
+  # 前端构建目录
+  publish = "frontend/dist"
+  
+  # 构建命令
+  command = "cd frontend && npm install && npm run build"
+
+[functions]
+  # Functions目录
+  directory = "netlify/functions"
+
+[[headers]]
+  # 为所有路径设置CORS头
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+
+[[headers]]
+  # 为API函数设置CORS
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+
+[[redirects]]
+  # SPA路由重定向
+  from = "/*"
+  to = "/index.html"
+  status = 200 
