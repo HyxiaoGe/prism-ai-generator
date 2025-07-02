@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { AIService } from '../services/aiService';
+import { UsageTracker } from '../services/usageTracker';
 import type { 
   GenerationConfig, 
   GenerationResult, 
@@ -18,6 +19,13 @@ interface AIGenerationState {
   // 配置
   currentConfig: Partial<GenerationConfig>;
   
+  // 用量追踪
+  usageStats: {
+    daily: { used: number; limit: number; remaining: number };
+    hourly: { used: number; limit: number; remaining: number };
+    session: { used: number; limit: number; remaining: number };
+  } | null;
+  
   // Actions
   setSelectedModel: (model: AIModel) => void;
   updateConfig: (config: Partial<GenerationConfig>) => void;
@@ -29,6 +37,7 @@ interface AIGenerationState {
   clearHistory: () => void;
   removeFromHistory: (id: string) => void;
   setAvailableModels: (models: AIModel[]) => void;
+  updateUsageStats: () => void;
 }
 
 const initialGenerationStatus: GenerationStatus = {
@@ -60,6 +69,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
       selectedModel: null,
       availableModels: [],
       currentConfig: defaultConfig,
+      usageStats: null,
 
       // Actions
       setSelectedModel: (model) => 
@@ -74,7 +84,16 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           'updateConfig'
         ),
 
-      startGeneration: async (config) => {        
+      startGeneration: async (config) => {
+        const usageTracker = UsageTracker.getInstance();
+        
+        // 检查用量限制
+        const usageCheck = usageTracker.canUse();
+        if (!usageCheck.allowed) {
+          get().failGeneration(usageCheck.reason || '使用次数已达上限');
+          return;
+        }        
+        
         set(
           {
             currentGeneration: {
@@ -93,16 +112,69 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         try {
           console.log('🎨 开始生成图像，配置:', config);
           
-          const { updateProgress } = get();
+                      const { updateProgress } = get();
           
-          // 真实API模式
-          updateProgress(5, 'processing');
+          // 智能进度模拟 - 模拟真实AI生成过程
+          const simulateProgress = () => {
+            let currentProgress = 0;
+            const interval = setInterval(() => {
+              if (!get().currentGeneration.isGenerating) {
+                clearInterval(interval);
+                return;
+              }
+              
+              // 模拟不同阶段的进度速度
+              if (currentProgress < 15) {
+                // 理解提示词阶段 - 较快
+                currentProgress += Math.random() * 3 + 1;
+                updateProgress(Math.min(currentProgress, 15), 'processing');
+              } else if (currentProgress < 50) {
+                // 生成草图阶段 - 中等速度
+                currentProgress += Math.random() * 2 + 0.5;
+                updateProgress(Math.min(currentProgress, 50), 'processing');
+              } else if (currentProgress < 85) {
+                // 细化细节阶段 - 较慢
+                currentProgress += Math.random() * 1.5 + 0.3;
+                updateProgress(Math.min(currentProgress, 85), 'processing');
+              } else if (currentProgress < 95) {
+                // 最终优化阶段 - 缓慢
+                currentProgress += Math.random() * 1 + 0.2;
+                updateProgress(Math.min(currentProgress, 95), 'processing');
+              }
+            }, 500); // 每500ms更新一次进度
+            
+            return interval;
+          };
           
-          // 调用真实的AI服务
-          const results = await AIService.generateImage(config);
+          // 开始进度模拟
+          const progressInterval = simulateProgress();
           
-          // 完成生成
-          get().completeGeneration(results);
+          try {
+            // 调用真实的AI服务
+            const results = await AIService.generateImage(config);
+            
+            // 清除进度模拟
+            clearInterval(progressInterval);
+            
+            // 完成最后的进度更新
+            updateProgress(100, 'processing');
+            
+            // 记录使用量
+            usageTracker.recordUsage();
+            
+            // 更新使用统计
+            const newStats = usageTracker.getUsageStats();
+            set((state) => ({ ...state, usageStats: newStats }), false, 'updateUsageStats');
+            
+            // 短暂延迟让用户看到100%进度
+            setTimeout(() => {
+              get().completeGeneration(results);
+            }, 500);
+            
+          } catch (error) {
+            clearInterval(progressInterval);
+            throw error;
+          }
           
         } catch (error) {
           console.error('❌ 生成失败:', error);
@@ -171,6 +243,12 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
       setAvailableModels: (models) =>
         set({ availableModels: models }, false, 'setAvailableModels'),
+
+      updateUsageStats: () => {
+        const usageTracker = UsageTracker.getInstance();
+        const stats = usageTracker.getUsageStats();
+        set({ usageStats: stats }, false, 'updateUsageStats');
+      },
     }),
     {
       name: 'ai-generation-store',

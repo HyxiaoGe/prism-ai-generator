@@ -1,16 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { Wand2, Sparkles, Settings, Zap, DollarSign } from 'lucide-react';
+import { Wand2, Sparkles, Settings, Zap, DollarSign, Tag, Lightbulb } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
 import type { GenerationConfig, AIModel } from '../types';
 
 interface PromptInputProps {
   className?: string;
+  initialPrompt?: string;
 }
 
-export function PromptInput({ className = '' }: PromptInputProps) {
-  const [prompt, setPrompt] = useState('');
+// 智能提示词建议数据
+const STYLE_TAGS = [
+  { label: '摄影级逼真', value: 'photorealistic, highly detailed, professional photography' },
+  { label: '油画风格', value: 'oil painting style, artistic, classical art' },
+  { label: '赛博朋克', value: 'cyberpunk style, neon lights, futuristic, sci-fi' },
+  { label: '水彩画', value: 'watercolor painting, soft colors, artistic' },
+  { label: '动漫风格', value: 'anime style, manga, japanese art' },
+  { label: '像素艺术', value: 'pixel art, 8-bit style, retro gaming' },
+  { label: '素描风格', value: 'pencil sketch, line art, black and white' },
+  { label: '梦幻风格', value: 'dreamy, ethereal, fantasy art, magical' },
+];
+
+const MOOD_TAGS = [
+  { label: '温暖明亮', value: 'warm lighting, bright, cheerful, sunny' },
+  { label: '神秘暗黑', value: 'dark, mysterious, moody lighting, shadows' },
+  { label: '浪漫唯美', value: 'romantic, beautiful, soft lighting, elegant' },
+  { label: '史诗壮观', value: 'epic, cinematic, dramatic, grand scale' },
+];
+
+const QUALITY_ENHANCERS = [
+  'highly detailed',
+  'masterpiece',
+  'best quality',
+  'ultra high resolution',
+  '4K',
+  'professional',
+  'award winning',
+];
+
+const COMMON_SUBJECTS = [
+  '一只可爱的小猫',
+  '未来科技城市',
+  '古老的森林',
+  '宇宙中的星球',
+  '魔法师在施法',
+  '日本樱花树',
+  '机器人朋友',
+  '龙在飞翔',
+];
+
+export function PromptInput({ className = '', initialPrompt = '' }: PromptInputProps) {
+  const [prompt, setPrompt] = useState(initialPrompt);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
   
@@ -21,6 +63,13 @@ export function PromptInput({ className = '' }: PromptInputProps) {
     startGeneration,
     cancelGeneration,
   } = useAIGenerationStore();
+
+  // 监听外部传入的初始提示词
+  useEffect(() => {
+    if (initialPrompt) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   // 加载可用模型
   useEffect(() => {
@@ -54,6 +103,40 @@ export function PromptInput({ className = '' }: PromptInputProps) {
     }
   };
 
+  // 智能提示词增强
+  const enhancePrompt = (basePrompt: string, styleTag?: string, moodTag?: string) => {
+    let enhanced = basePrompt.trim();
+    
+    if (styleTag) {
+      enhanced += `, ${styleTag}`;
+    }
+    
+    if (moodTag) {
+      enhanced += `, ${moodTag}`;
+    }
+    
+    // 添加质量增强词
+    const randomQuality = QUALITY_ENHANCERS[Math.floor(Math.random() * QUALITY_ENHANCERS.length)];
+    enhanced += `, ${randomQuality}`;
+    
+    return enhanced;
+  };
+
+  const addStyleTag = (styleValue: string) => {
+    const enhanced = enhancePrompt(prompt, styleValue);
+    setPrompt(enhanced);
+  };
+
+  const addMoodTag = (moodValue: string) => {
+    const enhanced = enhancePrompt(prompt, undefined, moodValue);
+    setPrompt(enhanced);
+  };
+
+  const useSubjectSuggestion = (subject: string) => {
+    setPrompt(subject);
+    setShowSuggestions(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || currentGeneration.isGenerating) return;
@@ -82,7 +165,7 @@ export function PromptInput({ className = '' }: PromptInputProps) {
   ];
 
   return (
-    <div className={`card p-6 ${className}`}>
+    <div className={`bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/60 ${className}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* 模型选择 */}
         <div>
@@ -90,7 +173,7 @@ export function PromptInput({ className = '' }: PromptInputProps) {
             <Zap className="inline w-4 h-4 mr-1" />
             选择AI模型
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {availableModels.map((model) => (
               <div
                 key={model.id}
@@ -139,12 +222,23 @@ export function PromptInput({ className = '' }: PromptInputProps) {
           </div>
         </div>
 
-        {/* 主要提示词输入 */}
+        {/* 智能提示词输入区域 */}
         <div>
-          <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
-            <Sparkles className="inline w-4 h-4 mr-1" />
-            描述你想要生成的图像
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="prompt" className="text-sm font-medium text-gray-700">
+              <Sparkles className="inline w-4 h-4 mr-1" />
+              描述你想要生成的图像
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowSuggestions(!showSuggestions)}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <Lightbulb className="w-4 h-4 mr-1" />
+              AI建议
+            </button>
+          </div>
+          
           <textarea
             id="prompt"
             value={prompt}
@@ -154,21 +248,82 @@ export function PromptInput({ className = '' }: PromptInputProps) {
             rows={4}
             disabled={currentGeneration.isGenerating}
           />
+
+          {/* 智能建议面板 */}
+          {showSuggestions && (
+            <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                <Tag className="w-4 h-4 mr-1" />
+                💡 智能提示词增强
+              </h4>
+              
+              {/* 主题建议 */}
+              <div className="mb-4">
+                <h5 className="text-sm font-medium text-gray-700 mb-2">🎯 主题建议</h5>
+                <div className="flex flex-wrap gap-2">
+                  {COMMON_SUBJECTS.slice(0, 4).map((subject) => (
+                    <button
+                      key={subject}
+                      type="button"
+                      onClick={() => useSubjectSuggestion(subject)}
+                      className="px-3 py-1 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-full transition-colors"
+                    >
+                      {subject}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 风格标签 */}
+              <div className="mb-4">
+                <h5 className="text-sm font-medium text-gray-700 mb-2">🎨 风格标签</h5>
+                <div className="flex flex-wrap gap-2">
+                  {STYLE_TAGS.slice(0, 6).map((style) => (
+                    <button
+                      key={style.label}
+                      type="button"
+                      onClick={() => addStyleTag(style.value)}
+                      className="px-3 py-1 text-sm bg-white hover:bg-purple-50 border border-purple-200 rounded-full transition-colors"
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 情绪氛围 */}
+              <div>
+                <h5 className="text-sm font-medium text-gray-700 mb-2">🌟 情绪氛围</h5>
+                <div className="flex flex-wrap gap-2">
+                  {MOOD_TAGS.map((mood) => (
+                    <button
+                      key={mood.label}
+                      type="button"
+                      onClick={() => addMoodTag(mood.value)}
+                      className="px-3 py-1 text-sm bg-white hover:bg-orange-50 border border-orange-200 rounded-full transition-colors"
+                    >
+                      {mood.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 示例提示词 */}
         <div>
           <p className="text-sm text-gray-600 mb-2">💡 试试这些示例：</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {examplePrompts.map((example, index) => (
+          <div className="space-y-2">
+            {examplePrompts.slice(0, 2).map((example, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => setPrompt(example)}
-                className="text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                className="w-full text-left p-3 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200 border border-gray-200/50"
                 disabled={currentGeneration.isGenerating}
               >
-                {example}
+                <div className="line-clamp-3">{example}</div>
               </button>
             ))}
           </div>
