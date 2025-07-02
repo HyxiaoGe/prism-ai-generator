@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Zap, History, Settings, Plus, Search, Grid } from 'lucide-react';
-import { PromptInput } from './components/PromptInput';
-import { LoadingIndicator } from './components/LoadingIndicator';
-import { ImageGrid } from './components/ImageGrid';
-import { useAIGenerationStore } from './store/aiGenerationStore';
+import { 
+  PromptInput, 
+  LoadingIndicator, 
+  ImageGrid, 
+  useAIGenerationStore 
+} from './features/ai-models';
 
 function App() {
   const { currentGeneration, generationHistory, usageStats, updateUsageStats } = useAIGenerationStore();
@@ -17,13 +19,16 @@ function App() {
     updateUsageStats();
   }, [updateUsageStats]);
 
-  // 监听生成完成，自动关闭设置面板并清空侧边栏提示词
+  // 监听生成状态变化，自动管理设置面板
   useEffect(() => {
-    if (currentGeneration.stage === 'completed') {
+    if (currentGeneration.isGenerating) {
+      // 生成开始时立即关闭设置面板
       setShowSettings(false);
-      setSidebarPrompt(''); // 清空侧边栏提示词，避免下次打开时有残留
+    } else if (currentGeneration.stage === 'completed') {
+      // 生成完成时清空侧边栏提示词，避免下次打开时有残留
+      setSidebarPrompt('');
     }
-  }, [currentGeneration.stage]);
+  }, [currentGeneration.isGenerating, currentGeneration.stage]);
 
   // 处理搜索框生成（简化版，主要通过PromptInput处理）
   const handleSearchGenerate = () => {
@@ -140,9 +145,12 @@ function App() {
       {/* 主要内容区域 */}
       <main className="pt-20">
         
-        {/* 快速创建面板 - 仅在没有内容时显示 */}
-        {generationHistory.length === 0 && (
-          <div className="max-w-4xl mx-auto px-6 py-16">
+        {/* 快速创建面板 - 仅在没有内容且未在生成时显示 */}
+        {(() => {
+          if (generationHistory.length === 0 && !currentGeneration.isGenerating) {
+            console.log('🏠 显示模板面板，generationHistory长度:', generationHistory.length, '是否正在生成:', currentGeneration.isGenerating);
+            return (
+              <div className="max-w-4xl mx-auto px-6 py-16">
             <div className="text-center mb-12">
               <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center">
                 <Zap className="w-10 h-10 text-white" />
@@ -177,24 +185,33 @@ function App() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* 生成进度 - 悬浮显示 */}
         {(currentGeneration.isGenerating || 
           currentGeneration.stage === 'completed' || 
           currentGeneration.stage === 'error') && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40">
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-60">
             <LoadingIndicator className="shadow-2xl" />
           </div>
         )}
 
         {/* 图像展示区域 - 瀑布流布局 */}
-        {generationHistory.length > 0 && (
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <ImageGrid viewMode={viewMode} />
-          </div>
-        )}
+        {(() => {
+          if (generationHistory.length > 0) {
+            console.log('🖼️ 显示图片网格，generationHistory长度:', generationHistory.length, '内容:', generationHistory);
+            return (
+              <div className="max-w-7xl mx-auto px-6 py-8">
+                <ImageGrid columns={viewMode === 'masonry' ? 5 : 4} />
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* 浮动创作按钮 */}
         <button 
