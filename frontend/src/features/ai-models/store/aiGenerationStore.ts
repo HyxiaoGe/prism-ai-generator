@@ -207,10 +207,10 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             console.log('📈 新的generationHistory长度:', newHistory.length);
             
             return {
-              currentGeneration: {
-                ...initialGenerationStatus,
-                stage: 'completed',
-              },
+            currentGeneration: {
+              ...initialGenerationStatus,
+              stage: 'completed',
+            },
               generationHistory: newHistory,
             };
           },

@@ -8,11 +8,15 @@ export { AIService } from './services/aiService';
 export { PromptInput } from './components/PromptInput';
 export { LoadingIndicator } from './components/LoadingIndicator';
 export { ImageGrid } from './components/ImageGrid';
+export { PromptFeatures, PromptFeaturesInline } from './components/PromptFeatures';
 
 // 适配器系统
 export { AdapterManager } from './services/AdapterManager';
 export { BaseModelAdapter } from './adapters/BaseAdapter';
 export { ReplicateAdapter } from './adapters/ReplicateAdapter';
+
+// 工具函数
+export { parsePromptFeatures } from './utils/promptParser';
 
 // 类型导出
 export type { 
@@ -22,6 +26,10 @@ export type {
   AIModel,
   ModelCapabilities 
 } from './types';
+
+export type {
+  ParsedPromptFeatures
+} from './utils/promptParser';
 
 // 适配器类型
 export type {

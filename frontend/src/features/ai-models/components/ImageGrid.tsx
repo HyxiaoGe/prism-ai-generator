@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import type { GenerationResult } from '../types';
+import { PromptFeatures, PromptFeaturesInline } from './PromptFeatures';
 
 interface ImageGridProps {
   columns?: number;
@@ -12,6 +13,55 @@ export function ImageGrid({ columns = 2, showHistory = true, className = '' }: I
   const { generationHistory, removeFromHistory, clearHistory } = useAIGenerationStore();
   const [selectedImage, setSelectedImage] = useState<GenerationResult | null>(null);
   const [imageLoadStates, setImageLoadStates] = useState<Record<string, boolean>>({});
+
+  // 获取显示的图像列表
+  const isGalleryMode = className?.includes('gallery-mode');
+  const displayImages = (showHistory || isGalleryMode) ? generationHistory : generationHistory.slice(0, 4);
+
+  // 获取当前选中图片的索引
+  const getCurrentImageIndex = () => {
+    if (!selectedImage) return -1;
+    return displayImages.findIndex(img => img.id === selectedImage.id);
+  };
+
+  // 切换到上一张图片
+  const goToPrevious = () => {
+    const currentIndex = getCurrentImageIndex();
+    if (currentIndex > 0) {
+      setSelectedImage(displayImages[currentIndex - 1]);
+    }
+  };
+
+  // 切换到下一张图片
+  const goToNext = () => {
+    const currentIndex = getCurrentImageIndex();
+    if (currentIndex < displayImages.length - 1) {
+      setSelectedImage(displayImages[currentIndex + 1]);
+    }
+  };
+
+  // 键盘快捷键支持
+  React.useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!selectedImage) return;
+      
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrevious();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNext();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedImage(null);
+      }
+    };
+
+    if (selectedImage) {
+      document.addEventListener('keydown', handleKeyPress);
+      return () => document.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [selectedImage, displayImages]);
 
   // 图像加载完成处理
   const handleImageLoad = (id: string) => {
@@ -73,9 +123,6 @@ export function ImageGrid({ columns = 2, showHistory = true, className = '' }: I
     }
   };
 
-  // 获取显示的图像列表
-  const displayImages = showHistory ? generationHistory : generationHistory.slice(0, 4);
-
   if (displayImages.length === 0) {
     return (
       <div className={`flex flex-col items-center justify-center py-16 text-center ${className}`}>
@@ -92,8 +139,8 @@ export function ImageGrid({ columns = 2, showHistory = true, className = '' }: I
 
   return (
     <div className={className}>
-      {/* 头部操作栏 */}
-      {showHistory && generationHistory.length > 0 && (
+      {/* 头部操作栏 - 画廊模式下隐藏 */}
+      {showHistory && generationHistory.length > 0 && !className?.includes('gallery-mode') && (
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-800">
             生成历史 ({generationHistory.length})
@@ -188,73 +235,113 @@ export function ImageGrid({ columns = 2, showHistory = true, className = '' }: I
               </div>
             </div>
             
-            {/* 图像信息 */}
-            <div className="p-4">
-              <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                {result.prompt}
-              </p>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>{result.createdAt.toLocaleDateString()}</span>
-                <button
-                  onClick={() => removeFromHistory(result.id)}
-                  className="text-red-500 hover:text-red-700 transition-colors"
+            {/* 图像信息 - 画廊模式下隐藏 */}
+            {!isGalleryMode && (
+              <div className="p-4">
+                {/* 使用特征标签显示 */}
+                <PromptFeaturesInline result={result} />
+                
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-3 pt-2 border-t border-gray-100">
+                  <span>🕒 {result.createdAt.toLocaleDateString()}</span>
+                  <button
+                    onClick={() => removeFromHistory(result.id)}
+                    className="text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50"
                   title="删除"
                 >
-                  删除
+                  🗑️ 删除
                 </button>
               </div>
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* 图像预览模态框 */}
+      {/* 图像预览模态框 - 响应式优化 */}
       {selectedImage && (
         <div 
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2 sm:p-4"
           onClick={() => setSelectedImage(null)}
         >
           <div 
-            className="relative max-w-4xl max-h-full bg-white rounded-xl overflow-hidden shadow-2xl"
+            className="relative w-full max-w-6xl h-full max-h-screen bg-white rounded-none sm:rounded-xl overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 关闭按钮 */}
             <button
               onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
             
-            {/* 图像 */}
-            <img
-              src={selectedImage.imageUrl}
-              alt={selectedImage.prompt}
-              className="w-full max-h-[80vh] object-contain"
-            />
+            {/* 图像容器 - 自适应高度 */}
+            <div className="flex-1 flex items-center justify-center bg-black min-h-0 relative">
+              {/* 左箭头 */}
+              {getCurrentImageIndex() > 0 && (
+                <button
+                  onClick={goToPrevious}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all hover:scale-110"
+                  title="上一张 (←)"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+
+              <img
+                src={selectedImage.imageUrl}
+                alt={selectedImage.prompt}
+                className="max-w-full max-h-full object-contain"
+              />
+
+              {/* 右箭头 */}
+              {getCurrentImageIndex() < displayImages.length - 1 && (
+                <button
+                  onClick={goToNext}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/50 hover:bg-black/70 text-white rounded-full transition-all hover:scale-110"
+                  title="下一张 (→)"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+
+              {/* 图片计数器 */}
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-black/50 text-white text-sm rounded-full">
+                {getCurrentImageIndex() + 1} / {displayImages.length}
+              </div>
+            </div>
             
-            {/* 信息栏 */}
-            <div className="p-6 bg-gray-50">
-              <p className="text-gray-800 mb-4">{selectedImage.prompt}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">
-                  生成时间: {selectedImage.createdAt.toLocaleString()}
-                </span>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => downloadImage(selectedImage)}
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                  >
-                    下载图像
-                  </button>
-                  <button
-                    onClick={() => shareImage(selectedImage)}
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                  >
-                    分享图像
-                  </button>
+            {/* 信息栏 - 可滚动 */}
+            <div className="flex-shrink-0 max-h-96 overflow-y-auto bg-gray-50">
+              <div className="p-3 sm:p-4">
+                {/* 使用完整特征标签显示 */}
+                <PromptFeatures result={selectedImage} showBasePrompt={true} />
+                
+                {/* 操作按钮区域 - 响应式布局 */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-3 pt-3 border-t border-gray-200">
+                  <span className="text-xs sm:text-sm text-gray-600">
+                    生成时间: {selectedImage.createdAt.toLocaleString()}
+                  </span>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                    <button
+                      onClick={() => downloadImage(selectedImage)}
+                      className="flex-1 sm:flex-none px-3 py-2 sm:px-4 sm:py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      📥 下载图像
+                    </button>
+                    <button
+                      onClick={() => shareImage(selectedImage)}
+                      className="flex-1 sm:flex-none px-3 py-2 sm:px-4 sm:py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      📤 分享图像
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

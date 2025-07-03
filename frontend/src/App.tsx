@@ -4,13 +4,14 @@ import {
   PromptInput, 
   LoadingIndicator, 
   ImageGrid, 
+  PromptFeatures,
   useAIGenerationStore 
 } from './features/ai-models';
 
 function App() {
   const { currentGeneration, generationHistory, usageStats, updateUsageStats } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'masonry'>('masonry');
+  const [viewMode, setViewMode] = useState<'gallery' | 'history'>('gallery');
   const [searchPrompt, setSearchPrompt] = useState('');
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
 
@@ -113,18 +114,20 @@ function App() {
               {/* 视图切换 */}
               <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl">
                 <button
-                  onClick={() => setViewMode('masonry')}
+                  onClick={() => setViewMode('gallery')}
                   className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'masonry' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                    viewMode === 'gallery' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
                   }`}
+                  title="画廊视图"
                 >
                   <Grid className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('grid')}
+                  onClick={() => setViewMode('history')}
                   className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                    viewMode === 'history' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
                   }`}
+                  title="历史记录"
                 >
                   <History className="w-4 h-4" />
                 </button>
@@ -200,15 +203,100 @@ function App() {
           </div>
         )}
 
-        {/* 图像展示区域 - 瀑布流布局 */}
+        {/* 图像展示区域 */}
         {(() => {
           if (generationHistory.length > 0) {
-            console.log('🖼️ 显示图片网格，generationHistory长度:', generationHistory.length, '内容:', generationHistory);
-            return (
-              <div className="max-w-7xl mx-auto px-6 py-8">
-                <ImageGrid columns={viewMode === 'masonry' ? 5 : 4} />
-              </div>
-            );
+            console.log('🖼️ 显示内容，generationHistory长度:', generationHistory.length, '视图模式:', viewMode);
+            
+            if (viewMode === 'gallery') {
+              // 画廊模式：纯图片展示，瀑布流布局
+              return (
+                <div className="max-w-7xl mx-auto px-6 py-8">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900">AI作品画廊</h2>
+                    <p className="text-gray-600 mt-1">展示您创作的所有AI图像作品</p>
+                  </div>
+                  <ImageGrid columns={5} showHistory={true} className="gallery-mode" />
+                </div>
+              );
+            } else {
+              // 历史记录模式：详细信息列表
+              return (
+                <div className="max-w-5xl mx-auto px-6 py-8">
+                  <div className="mb-6 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">生成历史</h2>
+                      <p className="text-gray-600 mt-1">查看详细的生成记录和参数</p>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      共 {generationHistory.length} 张图片
+                    </div>
+                  </div>
+                  
+                  {/* 历史记录列表 */}
+                  <div className="space-y-6">
+                    {generationHistory.map((result) => (
+                      <div key={result.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="flex flex-col md:flex-row">
+                          {/* 图片预览 */}
+                          <div className="md:w-48 md:h-48 w-full h-64 bg-gray-100">
+                            <img
+                              src={result.imageUrl}
+                              alt={result.prompt}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                          
+                                                      {/* 详细信息 */}
+                            <div className="flex-1 p-6">
+                                                            {/* 使用新的特征标签显示 */}
+                              <PromptFeatures result={result} showBasePrompt={true} />
+                              
+                              {/* 生成时间信息 */}
+                              <div className="mt-4 pt-3 border-t border-gray-100">
+                                <div className="text-xs text-gray-500">
+                                  🕒 生成时间: {result.createdAt.toLocaleString('zh-CN')}
+                                </div>
+                              </div>
+                              
+                              {/* 操作按钮 */}
+                              <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => {
+                                    // 下载图片
+                                    const a = document.createElement('a');
+                                    a.href = result.imageUrl;
+                                    a.download = `ai-generated-${result.id}.jpg`;
+                                    a.click();
+                                  }}
+                                  className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                                >
+                                  下载
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(result.prompt);
+                                    alert('提示词已复制到剪贴板');
+                                  }}
+                                  className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                                >
+                                  复制提示词
+                                </button>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                ID: {result.id}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
           }
           return null;
         })()}
