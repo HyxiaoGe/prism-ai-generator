@@ -9,6 +9,8 @@ export { PromptInput } from './components/PromptInput';
 export { LoadingIndicator } from './components/LoadingIndicator';
 export { ImageGrid } from './components/ImageGrid';
 export { PromptFeatures, PromptFeaturesInline } from './components/PromptFeatures';
+export { ModelSelector } from './components/ModelSelector';
+export { SettingsTabs } from './components/SettingsTabs';
 
 // 适配器系统
 export { AdapterManager } from './services/AdapterManager';

@@ -7,6 +7,7 @@ interface PromptInputProps {
   onGenerate?: (config: GenerationConfig) => void;
   disabled?: boolean;
   initialPrompt?: string;
+  compact?: boolean;
 }
 
 // 艺术风格组（单选 - 避免风格冲突）
@@ -62,7 +63,7 @@ const SUBJECT_SUGGESTIONS = [
 // 质量增强词汇（作为独立属性）
 const QUALITY_ENHANCEMENT = 'high quality, detailed, masterpiece, best quality, 4k resolution';
 
-export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }: PromptInputProps) {
+export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', compact = false }: PromptInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -222,7 +223,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
                          selectedEnhancements.length > 0 || isQualityEnhanced;
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-3" : "space-y-4"}>
       {/* 主输入框 */}
       <div className="relative">
         <textarea
@@ -346,9 +347,9 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
       )}
 
       {/* 艺术风格组（单选） */}
-      <div className="space-y-3">
+      <div className={compact ? "space-y-2" : "space-y-3"}>
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-800">🎨 艺术风格 <span className="text-xs text-gray-500">(单选)</span></h4>
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🎨 艺术风格 <span className="text-xs text-gray-500">(单选)</span></h4>
           {selectedArtStyle && (
             <span className="text-xs text-blue-600">已选择</span>
           )}
@@ -358,7 +359,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
             <button
               key={index}
               onClick={() => selectArtStyle(tag.value)}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
                 selectedArtStyle === tag.value
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -371,9 +372,9 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
       </div>
 
       {/* 主题风格组（单选） */}
-      <div className="space-y-3">
+      <div className={compact ? "space-y-2" : "space-y-3"}>
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-800">🌟 主题风格 <span className="text-xs text-gray-500">(单选)</span></h4>
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🌟 主题风格 <span className="text-xs text-gray-500">(单选)</span></h4>
           {selectedThemeStyle && (
             <span className="text-xs text-purple-600">已选择</span>
           )}
@@ -383,7 +384,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
             <button
               key={index}
               onClick={() => selectThemeStyle(tag.value)}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
                 selectedThemeStyle === tag.value
                   ? 'bg-purple-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -396,9 +397,9 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
       </div>
 
       {/* 情绪氛围组（单选） */}
-      <div className="space-y-3">
+      <div className={compact ? "space-y-2" : "space-y-3"}>
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-800">😊 情绪氛围 <span className="text-xs text-gray-500">(单选)</span></h4>
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>😊 情绪氛围 <span className="text-xs text-gray-500">(单选)</span></h4>
           {selectedMood && (
             <span className="text-xs text-orange-600">已选择</span>
           )}
@@ -408,7 +409,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
             <button
               key={index}
               onClick={() => selectMood(tag.value)}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
                 selectedMood === tag.value
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -421,9 +422,9 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
       </div>
 
       {/* 效果增强组（可多选） */}
-      <div className="space-y-3">
+      <div className={compact ? "space-y-2" : "space-y-3"}>
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-800">✨ 效果增强 <span className="text-xs text-gray-500">(可多选)</span></h4>
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>✨ 效果增强 <span className="text-xs text-gray-500">(可多选)</span></h4>
           {selectedEnhancements.length > 0 && (
             <span className="text-xs text-indigo-600">已选择 {selectedEnhancements.length} 个</span>
           )}
@@ -433,7 +434,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '' }
             <button
               key={index}
               onClick={() => toggleEnhancement(tag.value)}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
                 selectedEnhancements.includes(tag.value)
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

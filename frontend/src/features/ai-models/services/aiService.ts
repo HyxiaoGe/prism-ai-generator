@@ -12,10 +12,11 @@ export class AIService {
     return [
       {
         id: 'flux-schnell',
-        name: 'Flux Schnell',
+        name: 'black-forest-labs',
         description: '超快速生成，4步出图，适合快速迭代和预览',
         provider: 'replicate',
         isEnabled: true,
+        runsNumber: '392.8M',
         costPerGeneration: 0.003,
         tags: ['超快', '经济', '推荐'],
         defaultConfig: {
@@ -27,35 +28,39 @@ export class AIService {
         capabilities: {
           supportsAspectRatio: true,
           maxSteps: 4,
+          maxOutputs: 4, // Flux Schnell支持最多4张图片
           supportedFormats: ['webp', 'jpg', 'png'],
         },
       },
       {
-        id: 'flux-dev',
-        name: 'Flux Dev',
+        id: 'imagen-4-ultra',
+        name: 'Google',
         description: '高质量生成，细节丰富，适合最终作品和专业用途',
         provider: 'replicate',
         isEnabled: true,
+        runsNumber: '677.9K',
         costPerGeneration: 0.055,
         tags: ['高质量', '专业'],
         defaultConfig: {
           numInferenceSteps: 28,
           aspectRatio: '1:1',
-          outputFormat: 'webp',
-          numOutputs: 4,
+          outputFormat: 'jpg',
+          numOutputs: 1,
         },
         capabilities: {
           supportsAspectRatio: true,
           maxSteps: 50,
-          supportedFormats: ['webp', 'jpg', 'png'],
+          maxOutputs: 1, // Google Imagen模型只能生成1张图片
+          supportedFormats: ['jpg', 'png'],
         },
       },
       {
-        id: 'sdxl-lightning',
-        name: 'SDXL Lightning',
+        id: 'sdxl-lightning-4step',
+        name: 'ByteDance',
         description: '闪电生成速度，平衡质量与效率，支持多种风格',
         provider: 'replicate',
         isEnabled: true,
+        runsNumber: '1B',
         costPerGeneration: 0.004,
         tags: ['快速', '平衡'],
         defaultConfig: {
@@ -67,15 +72,17 @@ export class AIService {
         capabilities: {
           supportsAspectRatio: true,
           maxSteps: 8,
+          maxOutputs: 4, // ByteDance支持最多4张图片
           supportedFormats: ['webp', 'jpg', 'png'],
         },
       },
       {
-        id: 'stable-diffusion-xl',
-        name: 'Stable Diffusion XL',
+        id: 'stable-diffusion',
+        name: 'Stable Diffusion',
         description: '经典模型，兼容性强，支持多种风格和细致调参',
         provider: 'replicate',
         isEnabled: true,
+        runsNumber: '110.5M',
         costPerGeneration: 0.0095,
         tags: ['经典', '兼容'],
         defaultConfig: {
@@ -87,6 +94,7 @@ export class AIService {
         capabilities: {
           supportsAspectRatio: true,
           maxSteps: 50,
+          maxOutputs: 4, // Stable Diffusion支持最多4张图片
           supportedFormats: ['webp', 'jpg', 'png'],
         },
       },

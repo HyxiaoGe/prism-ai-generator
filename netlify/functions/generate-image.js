@@ -21,7 +21,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { prompt, model = 'flux-schnell', aspectRatio = '1:1', numInferenceSteps = 4, outputFormat = 'webp' } = JSON.parse(event.body);
+    const { prompt, model = 'flux-schnell', aspectRatio = '1:1', numInferenceSteps = 4, outputFormat = 'webp', numOutputs = 4 } = JSON.parse(event.body);
     
     if (!prompt) {
       return {
@@ -49,7 +49,8 @@ exports.handler = async (event, context) => {
       model,
       aspectRatio,
       numInferenceSteps,
-      outputFormat
+      outputFormat,
+      numOutputs
     }, REPLICATE_API_TOKEN);
 
     return {
@@ -84,15 +85,15 @@ const SUPPORTED_MODELS = {
     supportedFormats: ['webp', 'jpg', 'png'],
     numOutputs: 4,
   },
-  'flux-dev': {
-    version: 'black-forest-labs/flux-dev',
+  'imagen-4-ultra': {
+    version: 'google/imagen-4-ultra',
     defaultSteps: 28,
     maxSteps: 50,
     supportsAspectRatio: true,
-    supportedFormats: ['webp', 'jpg', 'png'],
-    numOutputs: 4,
+    supportedFormats: ['jpg', 'png'],
+    numOutputs: 1,
   },
-  'sdxl-lightning': {
+  'sdxl-lightning-4step': {
     version: 'bytedance/sdxl-lightning-4step:6f7a773af6fc3e8de9d5a3c00be77c17308914bf67772726aff83496ba1e3bbe',
     defaultSteps: 4,
     maxSteps: 8,
@@ -100,7 +101,7 @@ const SUPPORTED_MODELS = {
     supportedFormats: ['webp', 'jpg', 'png'],
     numOutputs: 4,
   },
-  'stable-diffusion-xl': {
+  'stable-diffusion': {
     version: 'stability-ai/stable-diffusion:ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4',
     defaultSteps: 20,
     maxSteps: 50,
@@ -111,7 +112,7 @@ const SUPPORTED_MODELS = {
 };
 
 async function generateWithReplicate(config, apiToken) {
-  const { prompt, model, aspectRatio, numInferenceSteps, outputFormat } = config;
+  const { prompt, model, aspectRatio, numInferenceSteps, outputFormat, numOutputs } = config;
   
   const modelConfig = SUPPORTED_MODELS[model];
   if (!modelConfig) {
@@ -129,6 +130,7 @@ async function generateWithReplicate(config, apiToken) {
       aspectRatio,
       numInferenceSteps,
       outputFormat,
+      numOutputs,
       modelConfig
     });
 
@@ -160,7 +162,7 @@ async function generateWithReplicate(config, apiToken) {
     return {
       status: 'succeeded',
       output: result.output || [],
-      input: { prompt, model, aspectRatio, numInferenceSteps, outputFormat }
+      input: { prompt, model, aspectRatio, numInferenceSteps, outputFormat, numOutputs }
     };
 
   } catch (error) {
@@ -170,10 +172,10 @@ async function generateWithReplicate(config, apiToken) {
 }
 
 // 根据不同模型构建输入参数
-function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, outputFormat, modelConfig }) {
+function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, outputFormat, numOutputs, modelConfig }) {
   const baseInput = {
     prompt: prompt,
-    num_outputs: modelConfig.numOutputs,
+    num_outputs: numOutputs,
     output_format: outputFormat,
     num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
   };
@@ -182,30 +184,31 @@ function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, output
   switch (model) {
     case 'flux-schnell':
     case 'flux-dev':
+    case 'imagen-4-ultra':
       return {
         ...baseInput,
         aspect_ratio: aspectRatio,
       };
     
-    case 'sdxl-lightning':
+    case 'sdxl-lightning-4step':
       return {
         prompt: prompt,
         width: 1024,
         height: 1024,
         scheduler: "K_EULER",
-        num_outputs: modelConfig.numOutputs,
+        num_outputs: numOutputs,
         guidance_scale: 0,
         negative_prompt: "worst quality, low quality",
         num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
         seed: Math.floor(Math.random() * 1000000), // 随机种子
       };
     
-    case 'stable-diffusion-xl':
+    case 'stable-diffusion':
       return {
         prompt: prompt,
         width: 1024,
         height: 1024,
-        num_outputs: modelConfig.numOutputs,
+        num_outputs: numOutputs,
         output_format: outputFormat,
         num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
         guidance_scale: 7.5,

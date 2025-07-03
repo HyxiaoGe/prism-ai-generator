@@ -163,10 +163,24 @@ export class ReplicateAdapter extends BaseModelAdapter {
       console.log('📊 result.data结构:', result.data);
       console.log('📊 result.data.output:', result.data.output);
       
-      const imageUrls = result.data.output || [];
-      if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-        console.error('❌ imageUrls无效:', imageUrls);
+      // 处理不同格式的输出数据
+      let imageUrls: string[] = [];
+      const rawOutput = result.data.output;
+      
+      if (Array.isArray(rawOutput)) {
+        // 多图输出格式（如 Flux 模型）
+        imageUrls = rawOutput;
+      } else if (typeof rawOutput === 'string' && rawOutput.trim()) {
+        // 单图输出格式（如 Google Imagen 模型）
+        imageUrls = [rawOutput];
+      } else {
+        console.error('❌ 无效的输出格式:', rawOutput);
         throw new Error('API返回的图像数据格式错误或为空');
+      }
+      
+      if (imageUrls.length === 0) {
+        console.error('❌ 没有生成任何图像');
+        throw new Error('没有生成任何图像');
       }
       
       console.log('🔗 提取到的图片URLs:', imageUrls);

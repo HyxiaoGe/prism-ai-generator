@@ -5,7 +5,9 @@ import {
   LoadingIndicator, 
   ImageGrid, 
   PromptFeatures,
-  useAIGenerationStore 
+  ModelSelector,
+  SettingsTabs,
+  useAIGenerationStore
 } from './features/ai-models';
 
 function App() {
@@ -320,8 +322,8 @@ function App() {
             />
             
             {/* 侧边栏 */}
-            <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300">
-              <div className="p-6 border-b border-gray-200">
+            <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+              <div className="p-6 border-b border-gray-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">创作设置</h3>
                   <button
@@ -333,8 +335,11 @@ function App() {
                 </div>
               </div>
               
-              <div className="p-6 overflow-y-auto h-full">
-                <PromptInput initialPrompt={sidebarPrompt} />
+              <div className="flex-1 overflow-hidden">
+                <SettingsTabs 
+                  initialPrompt={sidebarPrompt}
+                  disabled={currentGeneration.isGenerating}
+                />
               </div>
             </div>
           </>
