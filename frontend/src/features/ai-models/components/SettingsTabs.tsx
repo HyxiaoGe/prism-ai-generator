@@ -6,6 +6,7 @@ import { PromptInput } from './PromptInput';
 interface SettingsTabsProps {
   initialPrompt?: string;
   disabled?: boolean;
+  suggestedTags?: any;
 }
 
 type TabId = 'model' | 'prompt' | 'advanced';
@@ -16,7 +17,7 @@ const tabs = [
   { id: 'advanced' as TabId, label: '高级选项', icon: Sliders },
 ];
 
-export function SettingsTabs({ initialPrompt = '', disabled = false }: SettingsTabsProps) {
+export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTags }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('model');
 
   return (
@@ -58,6 +59,7 @@ export function SettingsTabs({ initialPrompt = '', disabled = false }: SettingsT
               initialPrompt={initialPrompt}
               disabled={disabled}
               compact={true}
+              suggestedTags={suggestedTags}
             />
           </div>
         )}

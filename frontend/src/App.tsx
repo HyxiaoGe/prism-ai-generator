@@ -24,6 +24,7 @@ function App() {
   const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
   const [searchPrompt, setSearchPrompt] = useState('');
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
+  const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
 
   // 初始化应用数据
   useEffect(() => {
@@ -55,6 +56,7 @@ function App() {
       // 生成完成时切换到画廊模式，清空侧边栏提示词
       setViewMode('gallery');
       setSidebarPrompt('');
+      setSuggestedTags(null);
     } else if (currentGeneration.stage === 'error') {
       // 生成失败时回到首页
       setViewMode('home');
@@ -66,18 +68,21 @@ function App() {
     if (!searchPrompt.trim()) return;
     // 将搜索框内容设置到右侧栏，然后打开设置面板
     setSidebarPrompt(searchPrompt);
+    setSuggestedTags(null); // 搜索框输入不使用推荐标签
     setShowSettings(true);
   };
 
   // 处理模板点击
-  const handleTemplateClick = (prompt: string) => {
-    setSidebarPrompt(prompt); // 只填充右侧栏，不影响搜索框
+  const handleTemplateClick = (template: any) => {
+    setSidebarPrompt(template.prompt); // 只填充右侧栏，不影响搜索框
+    setSuggestedTags(template.suggestedTags); // 设置推荐标签
     setShowSettings(true); // 打开设置面板
   };
 
   // 处理右下角+号点击
   const handleFloatingButtonClick = () => {
     setSidebarPrompt(''); // 清空右侧栏提示词
+    setSuggestedTags(null); // 清空推荐标签
     setShowSettings(!showSettings);
   };
 
@@ -217,14 +222,62 @@ function App() {
             {/* 快速开始模板 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               {[
-                { emoji: '🏞️', title: '风景照片', desc: '山川河流，自然风光', prompt: '壮丽的山川风景，夕阳西下，云海翻腾' },
-                { emoji: '👤', title: '人物肖像', desc: '人物头像，艺术肖像', prompt: '一位优雅的女性肖像，油画风格，细腻的光影' },
-                { emoji: '🚀', title: '科幻场景', desc: '未来世界，太空探索', prompt: '未来城市的科幻场景，霓虹灯闪烁，飞行器穿梭' },
-                { emoji: '🎨', title: '艺术创作', desc: '抽象艺术，创意设计', prompt: '抽象艺术作品，色彩斑斓，充满想象力' },
+                { 
+                  emoji: '🏔️', 
+                  title: '电影级风景', 
+                  desc: '专业摄影，震撼视觉', 
+                  prompt: '雄伟的雪山日出，天空云海翻腾，晨光洒向大地',
+                  suggestedTags: {
+                    artStyle: 'cinematic photography, film photography, dramatic lighting, cinematic composition',
+                    themeStyle: 'modern, minimalist, clean design, sleek, contemporary', 
+                    mood: 'epic, dramatic, cinematic, powerful, grand scale, awe-inspiring',
+                    technical: ['wide-angle lens, 24mm, expansive view, environmental context', 'golden hour lighting, warm sunlight, magic hour, soft shadows'],
+                    enhancements: ['cinematic composition, film photography, movie-like quality, Hollywood style', 'HDR photography, high dynamic range, enhanced contrast, vivid colors']
+                  }
+                },
+                { 
+                  emoji: '👩‍🎨', 
+                  title: '专业人像', 
+                  desc: '工作室级人像摄影', 
+                  prompt: '优雅女性艺术家肖像，柔和灯光下专注创作的神情',
+                  suggestedTags: {
+                    artStyle: 'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed',
+                    themeStyle: 'modern, minimalist, clean design, sleek, contemporary',
+                    mood: 'luxurious, elegant, sophisticated, premium, high-end, glamorous', 
+                    technical: ['85mm lens, portrait lens, shallow depth of field', 'studio lighting, softbox, professional lighting setup, controlled environment'],
+                    enhancements: ['professional photography, studio quality, commercial grade, award-winning', 'highly detailed, intricate details, ultra-detailed textures, photorealistic details']
+                  }
+                },
+                { 
+                  emoji: '🌆', 
+                  title: '赛博朋克', 
+                  desc: '未来科技美学', 
+                  prompt: '霓虹灯闪烁的未来都市夜景，雨水倒映着彩色光芒',
+                  suggestedTags: {
+                    artStyle: '3D render, CGI, ray tracing, volumetric lighting, subsurface scattering',
+                    themeStyle: 'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets',
+                    mood: 'futuristic, high-tech, digital, cyber, holographic, technological',
+                    technical: ['blue hour, twilight, evening atmosphere, city lights'],
+                    enhancements: ['volumetric lighting, god rays, atmospheric lighting, light beams', 'cinematic composition, film photography, movie-like quality, Hollywood style']
+                  }
+                },
+                { 
+                  emoji: '🎭', 
+                  title: '概念艺术', 
+                  desc: '游戏级概念设计', 
+                  prompt: '神秘的奇幻森林，古老的魔法光芒在林间穿梭',
+                  suggestedTags: {
+                    artStyle: 'concept art, digital painting, matte painting, professional illustration',
+                    themeStyle: 'fantasy, magical, mythical creatures, enchanted forest, mystical atmosphere',
+                    mood: 'dreamy, ethereal, soft, beautiful, pastel colors, fairy-tale like',
+                    technical: [],
+                    enhancements: ['highly detailed, intricate details, ultra-detailed textures, photorealistic details', 'masterpiece, award winning, gallery quality, museum piece']
+                  }
+                },
               ].map((template, index) => (
                 <div
                   key={index}
-                  onClick={() => handleTemplateClick(template.prompt)}
+                  onClick={() => handleTemplateClick(template)}
                   className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 hover:border-purple-200 transform hover:scale-105 hover:-translate-y-1"
                 >
                   <div className="text-center">
@@ -348,7 +401,7 @@ function App() {
             
             {/* 可滚动内容区域 */}
             <div className="flex-1 overflow-y-auto">
-              <SettingsTabs initialPrompt={sidebarPrompt} />
+              <SettingsTabs initialPrompt={sidebarPrompt} suggestedTags={suggestedTags} />
             </div>
           </div>
         </div>
