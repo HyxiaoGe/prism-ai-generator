@@ -22,7 +22,7 @@ export function SettingsTabs({ initialPrompt = '', disabled = false }: SettingsT
   return (
     <div className="flex flex-col h-full">
       {/* 标签页导航 */}
-      <div className="flex border-b border-gray-200 bg-gray-50">
+      <div className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -45,7 +45,7 @@ export function SettingsTabs({ initialPrompt = '', disabled = false }: SettingsT
       </div>
 
       {/* 标签页内容 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {activeTab === 'model' && (
           <div className="p-6">
             <ModelSelector disabled={disabled} compact={true} />

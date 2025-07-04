@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Wand2, Sparkles, Settings, Zap, DollarSign, Tag, Lightbulb } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
-import { AIService } from '../services/aiService';
-import type { GenerationConfig, AIModel } from '../types';
+import { AIService } from '../features/ai-models/services/aiService';
+import type { GenerationConfig, AIModel } from '../features/ai-models/types';
 
 interface PromptInputProps {
   className?: string;
@@ -76,9 +76,14 @@ export function PromptInput({ className = '', initialPrompt = '' }: PromptInputP
     const loadModels = async () => {
       try {
         const models = await AIService.getAvailableModels();
-        setAvailableModels(models);
-        if (models.length > 0) {
-          const defaultModel = models.find(m => m.tags.includes('推荐')) || models[0];
+        // 为模型添加默认的runsNumber字段
+        const modelsWithRunsNumber = models.map(model => ({
+          ...model,
+          runsNumber: model.runsNumber || model.id // 使用模型ID作为默认值
+        }));
+        setAvailableModels(modelsWithRunsNumber);
+        if (modelsWithRunsNumber.length > 0) {
+          const defaultModel = modelsWithRunsNumber.find(m => m.tags.includes('推荐')) || modelsWithRunsNumber[0];
           setSelectedModel(defaultModel);
           updateConfig({
             model: defaultModel.id,
@@ -95,7 +100,12 @@ export function PromptInput({ className = '', initialPrompt = '' }: PromptInputP
   const handleModelChange = (modelId: string) => {
     const model = availableModels.find(m => m.id === modelId);
     if (model) {
-      setSelectedModel(model);
+      // 确保模型有runsNumber字段
+      const modelWithRunsNumber = {
+        ...model,
+        runsNumber: model.runsNumber || model.id
+      };
+      setSelectedModel(modelWithRunsNumber);
       updateConfig({
         model: model.id,
         ...model.defaultConfig,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useAIGenerationStore } from '../store/aiGenerationStore';
+import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
 import type { AIModel, GenerationConfig } from '../types';
 
@@ -27,11 +27,16 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
       setIsLoading(true);
       try {
         const models = await AIService.getAvailableModels();
-        setAvailableModels(models);
+        // 为模型添加默认的runsNumber字段
+        const modelsWithRunsNumber = models.map(model => ({
+          ...model,
+          runsNumber: model.runsNumber || model.id
+        }));
+        setAvailableModels(modelsWithRunsNumber);
         
         // 如果没有选中模型，默认选择第一个可用模型
-        if (!selectedModel && models.length > 0) {
-          const defaultModel = models.find(m => m.id === 'flux-schnell') || models[0];
+        if (!selectedModel && modelsWithRunsNumber.length > 0) {
+          const defaultModel = modelsWithRunsNumber.find(m => m.id === 'flux-schnell') || modelsWithRunsNumber[0];
           setSelectedModel(defaultModel);
           updateConfig({ model: defaultModel.id });
         }

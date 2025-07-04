@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useAIGenerationStore } from '../store/aiGenerationStore';
-import type { GenerationResult } from '../types';
+import { useAIGenerationStore } from '../../../store/aiGenerationStore';
+import type { GenerationResult } from '../../../types';
 import { PromptFeatures, PromptFeaturesInline } from './PromptFeatures';
 
 interface ImageGridProps {

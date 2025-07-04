@@ -39,6 +39,7 @@ export interface GenerationStatus {
 export interface ModelCapabilities {
   supportsAspectRatio: boolean;
   maxSteps: number;
+  maxOutputs?: number; // 新增：最大输出数量限制
   supportedFormats: ('webp' | 'jpg' | 'png')[];
 }
 
@@ -49,6 +50,7 @@ export interface AIModel {
   description: string;
   provider: 'replicate' | 'huggingface' | 'openai';
   isEnabled: boolean;
+  runsNumber: string;
   costPerGeneration?: number;
   tags: string[]; // 新增：模型标签，如['快速', '经济', '推荐']
   defaultConfig: Partial<GenerationConfig>;

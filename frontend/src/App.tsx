@@ -1,35 +1,63 @@
 import { useEffect, useState } from 'react';
-import { Zap, History, Settings, Plus, Search, Grid } from 'lucide-react';
+import { Zap, History, Plus, Search, Grid, Image, Home } from 'lucide-react';
 import { 
   PromptInput, 
   LoadingIndicator, 
-  ImageGrid, 
   PromptFeatures,
   ModelSelector,
   SettingsTabs,
-  useAIGenerationStore
 } from './features/ai-models';
+import { ImageGrid } from './components/ImageGrid';
+import { useAIGenerationStore } from './store/aiGenerationStore';
 
 function App() {
-  const { currentGeneration, generationHistory, usageStats, updateUsageStats } = useAIGenerationStore();
+  const { 
+    currentGeneration, 
+    generationHistory, 
+    generationBatches, 
+    usageStats, 
+    isLoading,
+    updateUsageStats, 
+    loadHistoryFromDatabase 
+  } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
-  const [viewMode, setViewMode] = useState<'gallery' | 'history'>('gallery');
+  const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
   const [searchPrompt, setSearchPrompt] = useState('');
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
 
-  // 初始化使用统计
+  // 初始化应用数据
   useEffect(() => {
-    updateUsageStats();
-  }, [updateUsageStats]);
+    const initializeApp = async () => {
+      try {
+        // 更新使用统计
+        await updateUsageStats();
+        
+        // 从数据库加载历史记录
+        await loadHistoryFromDatabase();
+        
+        console.log('✅ 应用数据初始化完成');
+      } catch (error) {
+        console.error('❌ 应用数据初始化失败:', error);
+        // 不阻塞应用启动，只记录错误
+      }
+    };
 
-  // 监听生成状态变化，自动管理设置面板
+    initializeApp();
+  }, [updateUsageStats, loadHistoryFromDatabase]);
+
+  // 监听生成状态变化，自动管理视图模式
   useEffect(() => {
     if (currentGeneration.isGenerating) {
-      // 生成开始时立即关闭设置面板
+      // 生成开始时切换到创作模式，关闭设置面板
+      setViewMode('create');
       setShowSettings(false);
     } else if (currentGeneration.stage === 'completed') {
-      // 生成完成时清空侧边栏提示词，避免下次打开时有残留
+      // 生成完成时切换到画廊模式，清空侧边栏提示词
+      setViewMode('gallery');
       setSidebarPrompt('');
+    } else if (currentGeneration.stage === 'error') {
+      // 生成失败时回到首页
+      setViewMode('home');
     }
   }, [currentGeneration.isGenerating, currentGeneration.stage]);
 
@@ -52,6 +80,33 @@ function App() {
     setSidebarPrompt(''); // 清空右侧栏提示词
     setShowSettings(!showSettings);
   };
+
+  // 处理导航切换
+  const handleNavigationChange = (newMode: 'home' | 'gallery') => {
+    setViewMode(newMode);
+    setShowSettings(false); // 切换页面时关闭设置面板
+  };
+
+  // 检查是否有内容（使用generationBatches）
+  const hasContent = generationBatches.length > 0;
+
+  // 加载中状态
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center animate-fade-in">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
+            <Zap className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">正在加载中...</h2>
+          <p className="text-gray-600">正在从数据库加载您的作品画廊</p>
+          <div className="mt-4 w-32 h-1 bg-gray-200 rounded-full mx-auto overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,35 +168,29 @@ function App() {
                 </div>
               )}
               
-              {/* 视图切换 */}
+              {/* 导航切换 */}
               <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl">
                 <button
-                  onClick={() => setViewMode('gallery')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'gallery' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                  onClick={() => handleNavigationChange('home')}
+                  className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
+                    viewMode === 'home' ? 'bg-white shadow-sm text-purple-600' : 'hover:bg-gray-200 text-gray-600'
                   }`}
-                  title="画廊视图"
+                  title="首页"
                 >
-                  <Grid className="w-4 h-4" />
+                  <Home className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('history')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'history' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                  onClick={() => handleNavigationChange('gallery')}
+                  className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
+                    viewMode === 'gallery' ? 'bg-white shadow-sm text-purple-600' : 'hover:bg-gray-200 text-gray-600'
                   }`}
-                  title="历史记录"
+                  title="我的作品"
                 >
-                  <History className="w-4 h-4" />
+                  <Image className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* 设置按钮 */}
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <Settings className="w-5 h-5 text-gray-600" />
-              </button>
+
             </div>
           </div>
         </div>
@@ -150,12 +199,9 @@ function App() {
       {/* 主要内容区域 */}
       <main className="pt-20">
         
-        {/* 快速创建面板 - 仅在没有内容且未在生成时显示 */}
-        {(() => {
-          if (generationHistory.length === 0 && !currentGeneration.isGenerating) {
-            console.log('🏠 显示模板面板，generationHistory长度:', generationHistory.length, '是否正在生成:', currentGeneration.isGenerating);
-            return (
-              <div className="max-w-4xl mx-auto px-6 py-16">
+        {/* 根据视图模式显示不同内容 */}
+        {viewMode === 'home' && (
+          <div className="max-w-4xl mx-auto px-6 py-16 animate-fade-in">
             <div className="text-center mb-12">
               <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center">
                 <Zap className="w-10 h-10 text-white" />
@@ -173,178 +219,151 @@ function App() {
               {[
                 { emoji: '🏞️', title: '风景照片', desc: '山川河流，自然风光', prompt: '壮丽的山川风景，夕阳西下，云海翻腾' },
                 { emoji: '👤', title: '人物肖像', desc: '人物头像，艺术肖像', prompt: '一位优雅的女性肖像，油画风格，细腻的光影' },
-                { emoji: '🚀', title: '科幻场景', desc: '未来世界，太空探索', prompt: '未来科技城市，霓虹灯光，赛博朋克风格' },
-                { emoji: '🎨', title: '艺术创作', desc: '抽象艺术，创意设计', prompt: '抽象艺术作品，色彩丰富，现代艺术风格' },
+                { emoji: '🚀', title: '科幻场景', desc: '未来世界，太空探索', prompt: '未来城市的科幻场景，霓虹灯闪烁，飞行器穿梭' },
+                { emoji: '🎨', title: '艺术创作', desc: '抽象艺术，创意设计', prompt: '抽象艺术作品，色彩斑斓，充满想象力' },
               ].map((template, index) => (
                 <div
                   key={index}
                   onClick={() => handleTemplateClick(template.prompt)}
-                  className="group cursor-pointer bg-white rounded-2xl p-6 border border-gray-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300"
+                  className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 hover:border-purple-200 transform hover:scale-105 hover:-translate-y-1"
                 >
-                  <div className="text-3xl mb-4">{template.emoji}</div>
-                  <h3 className="font-semibold text-gray-900 mb-2">{template.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4">{template.desc}</p>
-                  <div className="text-xs text-purple-600 group-hover:text-purple-700 font-medium">
-                    点击填充提示词 →
+                  <div className="text-center">
+                    <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                      {template.emoji}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {template.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      {template.desc}
+                    </p>
+                    <button className="w-full bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 py-2 px-4 rounded-lg transition-colors text-sm font-medium">
+                      点击体验 →
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-              </div>
-            );
-          }
-          return null;
-        })()}
 
-        {/* 生成进度 - 悬浮显示 */}
-        {(currentGeneration.isGenerating || 
-          currentGeneration.stage === 'completed' || 
-          currentGeneration.stage === 'error') && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-60">
-            <LoadingIndicator className="shadow-2xl" />
+            {/* 成功案例或其他内容 */}
+            {hasContent && (
+              <div className="text-center">
+                <p className="text-gray-600 mb-4">
+                  您已经创作了 {generationBatches.length} 个作品批次
+                </p>
+                <button
+                  onClick={() => handleNavigationChange('gallery')}
+                  className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                >
+                  <Image className="w-5 h-5" />
+                  <span>查看我的作品</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 图像展示区域 */}
-        {(() => {
-          if (generationHistory.length > 0) {
-            console.log('🖼️ 显示内容，generationHistory长度:', generationHistory.length, '视图模式:', viewMode);
+        {/* 创作模式 - 生成过程中显示 */}
+        {viewMode === 'create' && (
+          <div className="max-w-4xl mx-auto px-6 py-16 animate-fade-in">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                AI正在为您创作中...
+              </h2>
+            </div>
             
-            if (viewMode === 'gallery') {
-              // 画廊模式：纯图片展示，瀑布流布局
-              return (
-                <div className="max-w-7xl mx-auto px-6 py-8">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">AI作品画廊</h2>
-                    <p className="text-gray-600 mt-1">展示您创作的所有AI图像作品</p>
-                  </div>
-                  <ImageGrid columns={5} showHistory={true} className="gallery-mode" />
-                </div>
-              );
-            } else {
-              // 历史记录模式：详细信息列表
-              return (
-                <div className="max-w-5xl mx-auto px-6 py-8">
-                  <div className="mb-6 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">生成历史</h2>
-                      <p className="text-gray-600 mt-1">查看详细的生成记录和参数</p>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      共 {generationHistory.length} 张图片
-                    </div>
-                  </div>
-                  
-                  {/* 历史记录列表 */}
-                  <div className="space-y-6">
-                    {generationHistory.map((result) => (
-                      <div key={result.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="flex flex-col md:flex-row">
-                          {/* 图片预览 */}
-                          <div className="md:w-48 md:h-48 w-full h-64 bg-gray-100">
-                            <img
-                              src={result.imageUrl}
-                              alt={result.prompt}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                          
-                                                      {/* 详细信息 */}
-                            <div className="flex-1 p-6">
-                                                            {/* 使用新的特征标签显示 */}
-                              <PromptFeatures result={result} showBasePrompt={true} />
-                              
-                              {/* 生成时间信息 */}
-                              <div className="mt-4 pt-3 border-t border-gray-100">
-                                <div className="text-xs text-gray-500">
-                                  🕒 生成时间: {result.createdAt.toLocaleString('zh-CN')}
-                                </div>
-                              </div>
-                              
-                              {/* 操作按钮 */}
-                              <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => {
-                                    // 下载图片
-                                    const a = document.createElement('a');
-                                    a.href = result.imageUrl;
-                                    a.download = `ai-generated-${result.id}.jpg`;
-                                    a.click();
-                                  }}
-                                  className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                                >
-                                  下载
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(result.prompt);
-                                    alert('提示词已复制到剪贴板');
-                                  }}
-                                  className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-                                >
-                                  复制提示词
-                                </button>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                ID: {result.id}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-          }
-          return null;
-        })()}
+            {/* 生成进度组件 */}
+            <LoadingIndicator />
+          </div>
+        )}
 
-        {/* 浮动创作按钮 */}
-        <button 
+        {/* 作品画廊模式 */}
+        {viewMode === 'gallery' && (
+          <div className="max-w-7xl mx-auto px-6 py-8 animate-fade-in">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">我的作品画廊</h2>
+                <p className="text-gray-600 mt-1">
+                  共 {generationBatches.length} 个作品批次，{generationHistory.length} 张图片
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleNavigationChange('home')}
+                  className="inline-flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>创作新作品</span>
+                </button>
+              </div>
+            </div>
+
+            {generationBatches.length > 0 ? (
+              <ImageGrid viewMode="masonry" />
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Image className="w-12 h-12 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">还没有作品</h3>
+                <p className="text-gray-600 mb-6">
+                  开始您的AI创作之旅，生成您的第一个作品吧！
+                </p>
+                <button
+                  onClick={() => handleNavigationChange('home')}
+                  className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>开始创作</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* 设置面板 */}
+      {showSettings && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setShowSettings(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 固定标题栏 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold text-gray-900">AI图像生成</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* 可滚动内容区域 */}
+            <div className="flex-1 overflow-y-auto">
+              <SettingsTabs initialPrompt={sidebarPrompt} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 右下角快捷按钮 - 仅在首页显示 */}
+      {viewMode === 'home' && (
+        <button
           onClick={handleFloatingButtonClick}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center justify-center z-50"
-          title="打开创作设置"
+          className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center z-40 transform hover:scale-110 active:scale-95 animate-bounce-subtle"
+          title="快速创作"
         >
           <Plus className="w-6 h-6" />
         </button>
-
-        {/* 设置侧边栏 */}
-        {showSettings && (
-          <>
-            {/* 遮罩 */}
-            <div
-              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-              onClick={() => setShowSettings(false)}
-            />
-            
-            {/* 侧边栏 */}
-            <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
-              <div className="p-6 border-b border-gray-200 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">创作设置</h3>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Plus className="w-5 h-5 rotate-45" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex-1 overflow-hidden">
-                <SettingsTabs 
-                  initialPrompt={sidebarPrompt}
-                  disabled={currentGeneration.isGenerating}
-                />
-              </div>
-            </div>
-          </>
-        )}
-      </main>
+      )}
     </div>
   );
 }

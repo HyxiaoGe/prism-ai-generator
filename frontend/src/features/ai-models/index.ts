@@ -1,7 +1,7 @@
 // AI模型功能模块的统一导出
 
 // 核心服务和Store
-export { useAIGenerationStore } from './store/aiGenerationStore';
+export { useAIGenerationStore } from '../../store/aiGenerationStore';
 export { AIService } from './services/aiService';
 
 // 组件

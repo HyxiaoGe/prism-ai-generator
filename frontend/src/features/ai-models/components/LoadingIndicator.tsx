@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAIGenerationStore } from '../store/aiGenerationStore';
+import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 
 // 生成阶段配置
 const GENERATION_STAGES = [

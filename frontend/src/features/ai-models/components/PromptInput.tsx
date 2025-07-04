@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAIGenerationStore } from '../store/aiGenerationStore';
+import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
-import type { GenerationConfig } from '../types';
+import type { GenerationConfig } from '../../../types';
 
 interface PromptInputProps {
   onGenerate?: (config: GenerationConfig) => void;
