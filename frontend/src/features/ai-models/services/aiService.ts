@@ -39,11 +39,11 @@ export class AIService {
         provider: 'replicate',
         isEnabled: true,
         runsNumber: '677.9K',
-        costPerGeneration: 0.055,
+        costPerGeneration: 0.004,
         tags: ['高质量', '专业'],
         defaultConfig: {
           numInferenceSteps: 28,
-          aspectRatio: '1:1',
+          aspectRatio: '16:9',
           outputFormat: 'jpg',
           numOutputs: 1,
         },
