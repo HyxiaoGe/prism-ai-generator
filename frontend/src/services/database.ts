@@ -169,7 +169,7 @@ export class DatabaseService {
   async getUserUsageStats(): Promise<UserUsageStats> {
     const user = await this.getOrCreateUser();
     
-    // 获取用户的反馈统计
+    // 🔒 安全优化：只查询必要的字段
     const { data: feedbackStats } = await supabase
       .from('image_feedback')
       .select('feedback_type')
@@ -268,6 +268,10 @@ export class DatabaseService {
     status?: 'pending' | 'completed' | 'failed';
     is_public?: boolean;
     tags_used?: Array<{name: string, category: TagCategory, value: string}>; // 新增：使用的标签
+    // 🔥 新增：R2存储相关字段
+    original_image_urls?: string[]; // 原始临时URL
+    r2_keys?: string[];             // R2存储的key数组
+    r2_data?: any;                  // R2存储的元数据
   }): Promise<Generation> {
     const user = await this.getOrCreateUser();
 
@@ -281,6 +285,10 @@ export class DatabaseService {
         image_urls: generation.image_urls,
         status: generation.status || 'completed',
         is_public: generation.is_public !== false,
+        // 🔥 新增：保存R2相关信息
+        original_image_urls: generation.original_image_urls,
+        r2_keys: generation.r2_keys,
+        r2_data: generation.r2_data,
       })
       .select()
       .single();
@@ -312,9 +320,23 @@ export class DatabaseService {
   async getUserGenerations(limit: number = 50): Promise<Generation[]> {
     const user = await this.getOrCreateUser();
 
+    // 🔒 安全优化：只查询必要字段，不暴露敏感信息
     const { data, error } = await supabase
       .from('generations')
-      .select('*')
+      .select(`
+        id,
+        user_id,
+        prompt,
+        model_name,
+        model_cost,
+        image_urls,
+        status,
+        created_at,
+        is_public,
+        original_image_urls,
+        r2_keys,
+        r2_data
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -327,12 +349,95 @@ export class DatabaseService {
   }
 
   /**
+   * 📄 分页获取用户生成历史
+   */
+  async getUserGenerationsWithPagination(params: {
+    limit?: number;
+    offset?: number;
+    page?: number; // 基于页码的分页
+  } = {}): Promise<{
+    data: Generation[];
+    total: number;
+    hasMore: boolean;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    const user = await this.getOrCreateUser();
+    const limit = params.limit || 10; // 默认每页10条
+    const page = params.page || 1;
+    const offset = params.offset !== undefined ? params.offset : (page - 1) * limit;
+
+    console.log(`📄 分页加载用户历史: 第${page}页, 每页${limit}条, 偏移${offset}`);
+
+    // 先获取总数
+    const { count, error: countError } = await supabase
+      .from('generations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (countError) {
+      throw new Error(`获取总数失败: ${countError.message}`);
+    }
+
+    const total = count || 0;
+    const totalPages = Math.ceil(total / limit);
+    const hasMore = page < totalPages;
+
+    // 获取分页数据
+    const { data, error } = await supabase
+      .from('generations')
+      .select(`
+        id,
+        user_id,
+        prompt,
+        model_name,
+        model_cost,
+        image_urls,
+        status,
+        created_at,
+        is_public,
+        original_image_urls,
+        r2_keys,
+        r2_data
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new Error(`获取分页历史失败: ${error.message}`);
+    }
+
+    console.log(`✅ 分页加载完成: ${data?.length || 0}/${total}条记录, 第${page}/${totalPages}页`);
+
+    return {
+      data: data || [],
+      total,
+      hasMore,
+      currentPage: page,
+      totalPages,
+    };
+  }
+
+  /**
    * 获取公开的生成记录（用于画廊）
    */
   async getPublicGenerations(limit: number = 100): Promise<Generation[]> {
+    // 🔒 安全优化：公开画廊不暴露用户敏感信息，使用匿名user_id
     const { data, error } = await supabase
       .from('generations')
-      .select('*')
+      .select(`
+        id,
+        prompt,
+        model_name,
+        image_urls,
+        status,
+        created_at,
+        is_public,
+        original_image_urls,
+        r2_keys,
+        r2_data
+      `)
       .eq('is_public', true)
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
@@ -342,7 +447,89 @@ export class DatabaseService {
       throw new Error(`获取公开生成记录失败: ${error.message}`);
     }
 
-    return data || [];
+    // 为公开记录添加匿名user_id和默认model_cost
+    return (data || []).map(record => ({
+      ...record,
+      user_id: 'anonymous', // 匿名用户ID
+      model_cost: 0, // 不暴露成本信息
+    }));
+  }
+
+  /**
+   * 📄 分页获取公开的生成记录（用于画廊）
+   */
+  async getPublicGenerationsWithPagination(params: {
+    limit?: number;
+    offset?: number;
+    page?: number;
+  } = {}): Promise<{
+    data: Generation[];
+    total: number;
+    hasMore: boolean;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    const limit = params.limit || 24; // 默认每页24条（6x4网格）
+    const page = params.page || 1;
+    const offset = params.offset !== undefined ? params.offset : (page - 1) * limit;
+
+    console.log(`📄 分页加载公开画廊: 第${page}页, 每页${limit}条, 偏移${offset}`);
+
+    // 先获取总数
+    const { count, error: countError } = await supabase
+      .from('generations')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_public', true)
+      .eq('status', 'completed');
+
+    if (countError) {
+      throw new Error(`获取公开记录总数失败: ${countError.message}`);
+    }
+
+    const total = count || 0;
+    const totalPages = Math.ceil(total / limit);
+    const hasMore = page < totalPages;
+
+    // 获取分页数据
+    const { data, error } = await supabase
+      .from('generations')
+      .select(`
+        id,
+        prompt,
+        model_name,
+        image_urls,
+        status,
+        created_at,
+        is_public,
+        original_image_urls,
+        r2_keys,
+        r2_data
+      `)
+      .eq('is_public', true)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new Error(`获取分页公开记录失败: ${error.message}`);
+    }
+
+    console.log(`✅ 公开画廊分页加载完成: ${data?.length || 0}/${total}条记录, 第${page}/${totalPages}页`);
+
+    // 为公开记录添加匿名user_id和默认model_cost
+    const mappedData = (data || []).map(record => ({
+      ...record,
+      user_id: 'anonymous', // 匿名用户ID
+      model_cost: 0, // 不暴露成本信息
+    }));
+
+    return {
+      data: mappedData,
+      total,
+      hasMore,
+      currentPage: page,
+      totalPages,
+    };
   }
 
   /**
@@ -903,9 +1090,16 @@ export class DatabaseService {
    * 获取批次反馈
    */
   async getImageFeedback(generationId: string): Promise<ImageFeedback[]> {
+    // 🔒 安全优化：只返回必要的反馈字段
     const { data, error } = await supabase
       .from('image_feedback')
-      .select('*')
+      .select(`
+        id,
+        generation_id,
+        image_urls,
+        feedback_type,
+        created_at
+      `)
       .eq('generation_id', generationId)
       .order('created_at', { ascending: false });
 
@@ -913,7 +1107,61 @@ export class DatabaseService {
       throw new Error(`获取批次反馈失败: ${error.message}`);
     }
 
-    return data || [];
+    // 为反馈记录添加匿名user_id和默认字段
+    return (data || []).map(record => ({
+      ...record,
+      user_id: 'current_user', // 不暴露真实user_id
+      tags_used: [], // 不暴露标签信息
+      model_used: '', // 不暴露模型信息
+    }));
+  }
+
+  /**
+   * 🚀 性能优化：批量获取多个generation的反馈
+   */
+  async getBatchImageFeedback(generationIds: string[]): Promise<Map<string, ImageFeedback[]>> {
+    if (generationIds.length === 0) {
+      return new Map();
+    }
+
+    console.log(`🔍 批量查询反馈: ${generationIds.length}个generation`);
+
+    // 🔒 安全优化：只返回必要的反馈字段
+    const { data, error } = await supabase
+      .from('image_feedback')
+      .select(`
+        id,
+        generation_id,
+        image_urls,
+        feedback_type,
+        created_at
+      `)
+      .in('generation_id', generationIds)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`批量获取反馈失败: ${error.message}`);
+    }
+
+    // 按generation_id分组
+    const feedbackMap = new Map<string, ImageFeedback[]>();
+    
+    (data || []).forEach(record => {
+      const feedback: ImageFeedback = {
+        ...record,
+        user_id: 'current_user', // 不暴露真实user_id
+        tags_used: [], // 不暴露标签信息
+        model_used: '', // 不暴露模型信息
+      };
+
+      if (!feedbackMap.has(record.generation_id)) {
+        feedbackMap.set(record.generation_id, []);
+      }
+      feedbackMap.get(record.generation_id)!.push(feedback);
+    });
+
+    console.log(`✅ 批量查询完成: 找到${data?.length || 0}条反馈记录`);
+    return feedbackMap;
   }
 
   /**

@@ -40,6 +40,15 @@ interface AIGenerationState {
   // 加载状态
   isLoading: boolean;
   
+  // 📄 新增：分页状态
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    total: number;
+    hasMore: boolean;
+    isLoadingMore: boolean;
+  };
+  
   // Actions
   setSelectedModel: (model: AIModel) => void;
   updateConfig: (config: Partial<GenerationConfig>) => void;
@@ -54,6 +63,10 @@ interface AIGenerationState {
   setAvailableModels: (models: AIModel[]) => void;
   updateUsageStats: () => Promise<void>;
   loadHistoryFromDatabase: () => Promise<void>; // 新增：从数据库加载历史记录
+  // 📄 新增：分页方法
+  loadHistoryWithPagination: (page?: number, replace?: boolean) => Promise<void>;
+  loadMoreHistory: () => Promise<void>;
+  resetPagination: () => void;
   setLoading: (loading: boolean) => void;
   prepareRegeneration: (result: GenerationResult) => Promise<void>; // 新增：准备重新生成
   updateImageFeedback: (batchId: string, resultIndex: number, feedback: { type: 'like' | 'dislike' | null, submittedAt?: Date }) => void; // 新增：更新图片反馈
@@ -92,6 +105,14 @@ export const useAIGenerationStore = create<AIGenerationState>()(
       currentConfig: defaultConfig,
       usageStats: null,
       isLoading: false,
+      // 📄 分页状态
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        total: 0,
+        hasMore: false,
+        isLoadingMore: false,
+      },
 
       // Actions
       setSelectedModel: (model) => 
@@ -246,6 +267,87 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             const models = await AIService.getAvailableModels();
             const model = models.find(m => m.id === state.currentConfig.model);
             const modelCost = model?.costPerGeneration || 0;
+
+            // 🔥 新增：上传图片到R2存储
+            let uploadedResults = results;
+            try {
+              console.log('🚀 开始上传图片到R2存储...');
+              const imageUrls = results.map(result => result.imageUrl);
+              const uploadResponse = await fetch('/.netlify/functions/upload-to-r2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  imageUrls,
+                  prompt: prompt,
+                  batchId: batchId,
+                }),
+              });
+
+              if (uploadResponse.ok || uploadResponse.status === 206) {
+                const uploadData = await uploadResponse.json();
+                console.log('✅ R2上传响应:', uploadData);
+                
+                // 更新results，添加R2 URL信息
+                uploadedResults = results.map((result, index) => {
+                  const r2Result = uploadData.data.results[index];
+                  if (!r2Result) return result;
+
+                  // 🔥 优先使用publicUrl，其次使用签名URL，最后使用原始URL
+                  const bestUrl = r2Result.publicUrl || r2Result.url || result.imageUrl;
+                  
+                  console.log(`🖼️ 图片 ${index + 1} URL更新:`, {
+                    原始URL: result.imageUrl,
+                    公共URL: r2Result.publicUrl || '未配置',
+                    签名URL: r2Result.url ? '已生成' : '未生成',
+                    最终使用: bestUrl
+                  });
+
+                  return {
+                    ...result,
+                    // 保留原始URL作为备用
+                    originalImageUrl: result.imageUrl,
+                    // 🔥 优先使用公共URL
+                    imageUrl: bestUrl,
+                    // 添加R2相关信息
+                    r2Info: {
+                      key: r2Result.key,
+                      url: r2Result.url,
+                      publicUrl: r2Result.publicUrl,
+                      size: r2Result.size,
+                      etag: r2Result.etag,
+                    },
+                  };
+                });
+
+                // 更新状态中的批次数据
+                set((state) => ({
+                  generationBatches: state.generationBatches.map(batch => 
+                    batch.id === batchId 
+                      ? { ...batch, results: uploadedResults }
+                      : batch
+                  ),
+                }), false, 'updateBatchWithR2Urls');
+
+                // 显示成功或部分成功消息
+                if (uploadResponse.status === 206 && uploadData.warnings) {
+                  console.warn('⚠️ 部分上传警告:', uploadData.warnings);
+                  console.log(`📊 上传统计: ${uploadData.data.uploadedCount}/${uploadData.data.totalCount} 成功`);
+                } else {
+                  console.log('✅ 所有图片上传成功');
+                }
+              } else {
+                const errorText = await uploadResponse.text().catch(() => '未知错误');
+                console.error('❌ R2上传失败:', {
+                  status: uploadResponse.status,
+                  error: errorText
+                });
+                // 保持原始URL，不阻塞整个流程
+                console.log('🔄 保持使用原始临时URL');
+              }
+            } catch (r2Error) {
+              console.error('❌ R2上传过程中出错:', r2Error);
+              // 即使R2上传失败，也继续保存到数据库
+            }
             
             // 将选择的标签转换为数据库所需的格式
             const tagsUsed = [];
@@ -441,10 +543,14 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               prompt: prompt,
               model_name: state.currentConfig.model || 'flux-schnell',
               model_cost: modelCost,
-              image_urls: results.map(r => r.imageUrl),
+              image_urls: uploadedResults.map(r => r.imageUrl), // 🔥 使用R2 URL
               status: 'completed',
               is_public: true,
               tags_used: tagsUsed, // 传递标签信息
+              // 🔥 新增：保存R2相关信息
+              original_image_urls: uploadedResults.map(r => r.originalImageUrl).filter((url): url is string => Boolean(url)),
+              r2_keys: uploadedResults.map(r => r.r2Info?.key).filter((key): key is string => Boolean(key)),
+              r2_data: uploadedResults.map(r => r.r2Info).filter(Boolean),
             });
 
             // 更新批次和结果的真实 generation_id
@@ -770,47 +876,57 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           const databaseService = DatabaseService.getInstance();
           const { generationBatches } = get();
           
-          // 为每个批次的每张图片查询反馈状态
-          const updatedBatches = await Promise.all(
-            generationBatches.map(async (batch) => {
-                             const updatedResults = await Promise.all(
-                 batch.results.map(async (result, index) => {
-                   try {
-                     // 使用真实的 generation_id，如果没有则跳过查询
-                     const generationId = result.realGenerationId || batch.realGenerationId;
-                     
-                     if (!generationId) {
-                       return result;
-                     }
-                     
-                     // 查询这个批次的反馈
-                     const feedbacks = await databaseService.getImageFeedback(generationId);
-                     
-                     if (feedbacks.length > 0) {
-                       const feedback = feedbacks[0]; // 取最新的反馈
-                       return {
-                         ...result,
-                         userFeedback: {
-                           type: feedback.feedback_type,
-                           submittedAt: new Date(feedback.created_at)
-                         }
-                       };
-                     }
-                     
-                     return result;
-                   } catch (error) {
-                     console.error(`❌ 加载图片反馈失败 (${result.imageUrl}):`, error);
-                     return result;
-                   }
-                 })
-               );
-              
-              return {
-                ...batch,
-                results: updatedResults
-              };
-            })
-          );
+          console.log(`🔍 开始加载反馈状态 - 共${generationBatches.length}个批次`);
+          
+          // 🚀 性能优化：收集所有唯一的generation_id，避免重复查询
+          const generationIds = new Set<string>();
+          generationBatches.forEach(batch => {
+            const generationId = batch.realGenerationId;
+            if (generationId) {
+              generationIds.add(generationId);
+            }
+          });
+          
+          if (generationIds.size === 0) {
+            console.log('⚠️ 没有找到有效的generation_id，跳过反馈加载');
+            return;
+          }
+          
+          console.log(`📊 批量查询${generationIds.size}个generation的反馈（之前会有${generationBatches.reduce((sum, batch) => sum + batch.results.length, 0)}次查询）`);
+          
+          // 🚀 使用新的批量查询API，一次请求获取所有反馈
+          const feedbackMap = await databaseService.getBatchImageFeedback(Array.from(generationIds));
+          
+          // 更新批次数据
+          const updatedBatches = generationBatches.map(batch => {
+            const generationId = batch.realGenerationId;
+            
+            if (!generationId || !feedbackMap.has(generationId)) {
+              return batch; // 没有反馈数据，保持原样
+            }
+            
+            const feedbacks = feedbackMap.get(generationId)!;
+            if (feedbacks.length === 0) {
+              return batch; // 没有反馈，保持原样
+            }
+            
+            // 使用最新的反馈（第一个，因为已按时间降序排列）
+            const latestFeedback = feedbacks[0];
+            
+            // 为整个批次的所有图片应用相同的反馈状态
+            const updatedResults = batch.results.map(result => ({
+              ...result,
+              userFeedback: {
+                type: latestFeedback.feedback_type,
+                submittedAt: new Date(latestFeedback.created_at)
+              }
+            }));
+            
+            return {
+              ...batch,
+              results: updatedResults
+            };
+          });
           
           // 更新状态
           set(
@@ -823,9 +939,167 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             'loadFeedbackStates'
           );
           
+          console.log(`✅ 反馈状态加载完成 - 优化后只需1次数据库查询`);
+          
         } catch (error) {
           console.error('❌ 加载反馈状态失败:', error);
         }
+      },
+
+      // 📄 新增：分页方法实现
+      loadHistoryWithPagination: async (page = 1, replace = false) => {
+        try {
+          const databaseService = DatabaseService.getInstance();
+          
+          // 设置加载状态
+          if (replace) {
+            set({ isLoading: true }, false, 'loadHistoryWithPagination');
+          } else {
+            set((state) => ({
+              pagination: { ...state.pagination, isLoadingMore: true }
+            }), false, 'loadHistoryWithPagination');
+          }
+
+          console.log(`📄 ${replace ? '重新' : '分页'}加载历史记录 - 第${page}页`);
+
+          // 获取分页数据
+          const result = await databaseService.getUserGenerationsWithPagination({ page, limit: 10 });
+          
+          if (result.data.length === 0 && page === 1) {
+            // 第一页没有数据
+            set({
+              generationHistory: [],
+              generationBatches: [],
+              isLoading: false,
+              pagination: {
+                currentPage: 1,
+                totalPages: 1,
+                total: 0,
+                hasMore: false,
+                isLoadingMore: false,
+              }
+            }, false, 'loadHistoryWithPagination');
+            return;
+          }
+
+          // 处理数据，转换为批次格式
+          const batchesMap = new Map<string, GenerationBatch>();
+          const historyResults: GenerationResult[] = [];
+          
+          // 按时间降序排列
+          result.data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+          for (const record of result.data) {
+            // 处理时区转换
+            const utcDate = new Date(record.created_at);
+            const localDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000)); // UTC+8
+            
+            // 处理图片URLs数组
+            const imageUrls = Array.isArray(record.image_urls) ? record.image_urls : [record.image_urls];
+            
+            // 为每张图片创建GenerationResult对象
+            const batchResults: GenerationResult[] = [];
+            imageUrls.forEach((imageUrl, index) => {
+              const result: GenerationResult = {
+                id: `${record.id}_${index}`,
+                imageUrl: imageUrl,
+                prompt: record.prompt,
+                createdAt: localDate,
+                status: record.status as 'completed' | 'failed',
+                config: {
+                  model: record.model_name,
+                  prompt: record.prompt,
+                  aspectRatio: '1:1',
+                  numOutputs: imageUrls.length,
+                  outputFormat: 'webp',
+                  numInferenceSteps: 4,
+                  width: 1024,
+                  height: 1024,
+                  steps: 4,
+                  guidance: 7.5,
+                },
+                userFeedback: undefined,
+                realGenerationId: record.id
+              };
+              
+              batchResults.push(result);
+              historyResults.push(result);
+            });
+            
+            // 创建批次
+            const timeKey = localDate.toISOString().substring(0, 16);
+            const batchKey = `${record.prompt}_${timeKey}`;
+            
+            if (!batchesMap.has(batchKey)) {
+              const batch: GenerationBatch = {
+                id: `batch_${record.id}_${Math.random().toString(36).substr(2, 9)}`,
+                prompt: record.prompt,
+                config: batchResults[0].config,
+                results: batchResults,
+                createdAt: localDate,
+                model: record.model_name,
+                realGenerationId: record.id
+              };
+              batchesMap.set(batchKey, batch);
+            } else {
+              const existingBatch = batchesMap.get(batchKey)!;
+              existingBatch.results.push(...batchResults);
+            }
+          }
+          
+          // 转换为数组并排序
+          const newBatches = Array.from(batchesMap.values())
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          
+          // 更新状态
+          set((state) => ({
+            generationHistory: replace ? historyResults : [...state.generationHistory, ...historyResults],
+            generationBatches: replace ? newBatches : [...state.generationBatches, ...newBatches],
+            isLoading: false,
+            pagination: {
+              currentPage: result.currentPage,
+              totalPages: result.totalPages,
+              total: result.total,
+              hasMore: result.hasMore,
+              isLoadingMore: false,
+            }
+          }), false, 'loadHistoryWithPagination');
+          
+          // 异步加载反馈状态
+          if (newBatches.length > 0) {
+            get().loadFeedbackStates().catch(console.error);
+          }
+          
+        } catch (error) {
+          console.error('❌ 分页加载历史记录失败:', error);
+          set((state) => ({
+            isLoading: false,
+            pagination: { ...state.pagination, isLoadingMore: false }
+          }), false, 'loadHistoryWithPagination');
+        }
+      },
+
+      loadMoreHistory: async () => {
+        const { pagination } = get();
+        if (!pagination.hasMore || pagination.isLoadingMore) {
+          return;
+        }
+        
+        await get().loadHistoryWithPagination(pagination.currentPage + 1, false);
+      },
+
+      resetPagination: () => {
+        set({
+          generationHistory: [],
+          generationBatches: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            total: 0,
+            hasMore: false,
+            isLoadingMore: false,
+          }
+        }, false, 'resetPagination');
       },
     }),
     {

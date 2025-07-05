@@ -20,8 +20,12 @@ function App() {
     usageStats, 
     isLoading,
     currentConfig,
+    pagination,
     updateUsageStats, 
     loadHistoryFromDatabase,
+    loadHistoryWithPagination,
+    loadMoreHistory,
+    resetPagination,
     prepareRegeneration 
   } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
@@ -247,8 +251,8 @@ function App() {
         // 更新使用统计
         await updateUsageStats();
         
-        // 从数据库加载历史记录
-        await loadHistoryFromDatabase();
+        // 📄 使用分页方式加载历史记录（第一页）
+        await loadHistoryWithPagination(1, true);
         
         console.log('✅ 应用数据初始化完成');
       } catch (error) {
@@ -258,7 +262,7 @@ function App() {
     };
 
     initializeApp();
-  }, [updateUsageStats, loadHistoryFromDatabase]);
+  }, [updateUsageStats, loadHistoryWithPagination]);
 
   // 监听生成状态变化，自动管理视图模式
   useEffect(() => {
@@ -583,7 +587,7 @@ function App() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">我的作品画廊</h2>
                 <p className="text-gray-600 mt-1">
-                  共 {generationBatches.length} 个作品批次，{generationHistory.length} 张图片
+                  共 {pagination.total} 个作品批次 | 已加载 {generationBatches.length} 个批次 (每页10个)，{generationHistory.length} 张图片
                 </p>
               </div>
               
@@ -599,7 +603,53 @@ function App() {
             </div>
 
             {generationBatches.length > 0 ? (
-              <ImageGrid viewMode="masonry" onRegenerate={handleRegenerate} />
+              <>
+                <ImageGrid viewMode="masonry" onRegenerate={handleRegenerate} />
+                
+                {/* 📄 分页控制 */}
+                <div className="mt-12 text-center">
+                  <div className="mb-6">
+                                         <p className="text-gray-600 text-sm">
+                       已显示 {generationBatches.length} 个批次，共 {pagination.total} 个批次
+                       {pagination.totalPages > 1 && (
+                         <span className="ml-2">
+                           第 {pagination.currentPage} / {pagination.totalPages} 页 (每页10个批次)
+                         </span>
+                       )}
+                     </p>
+                  </div>
+                  
+                  {pagination.hasMore && (
+                    <button
+                      onClick={loadMoreHistory}
+                      disabled={pagination.isLoadingMore}
+                      className={`inline-flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                        pagination.isLoadingMore
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:shadow-lg'
+                      }`}
+                    >
+                      {pagination.isLoadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                          <span>加载中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <History className="w-4 h-4" />
+                          <span>加载更多作品</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  
+                  {!pagination.hasMore && pagination.total > 0 && (
+                    <p className="text-gray-500 text-sm">
+                      🎉 已显示全部作品
+                    </p>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="text-center py-16">
                 <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">

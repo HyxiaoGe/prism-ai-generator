@@ -28,6 +28,15 @@ export interface GenerationConfig {
   };
 }
 
+// R2存储信息
+export interface R2Info {
+  key: string;
+  url: string;
+  publicUrl?: string;
+  size: number;
+  etag: string;
+}
+
 // 生成结果
 export interface GenerationResult {
   id: string;
@@ -43,6 +52,9 @@ export interface GenerationResult {
   };
   // 新增：真实的数据库generation_id（UUID格式）
   realGenerationId?: string;
+  // 🔥 新增：R2存储相关字段
+  originalImageUrl?: string; // 保留原始URL作为备用
+  r2Info?: R2Info; // R2存储的详细信息
 }
 
 // 生成状态

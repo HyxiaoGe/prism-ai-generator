@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { parsePromptFeatures } from '../features/ai-models/utils/promptParser';
@@ -9,6 +9,123 @@ interface ImageGridProps {
   viewMode: 'grid' | 'masonry';
   onRegenerate?: (batch: any) => void; // 新增：重新生成回调（批次级别）
 }
+
+// 🚀 新增：懒加载图片组件
+interface LazyImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+  onLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  onClick?: (e?: React.MouseEvent<HTMLImageElement>) => void;
+  style?: React.CSSProperties;
+  priority?: boolean; // 高优先级图片立即加载（如弹窗预览）
+}
+
+const LazyImage: React.FC<LazyImageProps> = ({ src, alt, className, onLoad, onClick, style, priority = false }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(priority); // 高优先级图片直接视为在视口内
+  const [hasError, setHasError] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const placeholderRef = useRef<HTMLDivElement>(null);
+
+  // 🔍 Intersection Observer 监控图片是否进入视口（仅对非优先级图片生效）
+  useEffect(() => {
+    if (priority) return; // 高优先级图片跳过观察器
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        rootMargin: '50px', // 提前50px开始加载
+        threshold: 0.1
+      }
+    );
+
+    if (placeholderRef.current) {
+      observer.observe(placeholderRef.current);
+    }
+
+    return () => {
+      if (placeholderRef.current) {
+        observer.unobserve(placeholderRef.current);
+      }
+    };
+  }, [priority]);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    setIsLoaded(true);
+    if (onLoad) {
+      onLoad(e);
+    }
+  }, [onLoad]);
+
+  const handleImageError = useCallback(() => {
+    setHasError(true);
+    setIsLoaded(true);
+  }, []);
+
+  return (
+    <div ref={placeholderRef} className="relative w-full h-full" style={style}>
+      {/* 占位符 - 在图片加载前显示 */}
+      {!isLoaded && (
+        <div className={`${className} bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center border border-gray-200/50`}>
+          <div className="flex flex-col items-center justify-center p-4">
+            {isInView ? (
+              <>
+                {/* 加载动画 */}
+                <div className="w-8 h-8 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin mb-2"></div>
+                <span className="text-xs text-gray-500 font-medium">加载中...</span>
+              </>
+            ) : (
+              <>
+                {/* 未进入视口时的图标 */}
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-2">
+                  <Image className="w-6 h-6 text-gray-400" />
+                </div>
+                <span className="text-xs text-gray-400 font-medium">即将加载</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 实际图片 - 只有进入视口才开始加载 */}
+      {isInView && (
+        <>
+          {hasError ? (
+            // 加载失败时的占位符
+            <div className={`${className} bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center border border-red-200/50`}>
+              <div className="flex flex-col items-center justify-center p-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2">
+                  <Sparkles className="w-6 h-6 text-red-400" />
+                </div>
+                <span className="text-xs text-red-600 font-medium">加载失败</span>
+                <span className="text-xs text-gray-500 mt-1">请使用重新生成按钮</span>
+              </div>
+            </div>
+          ) : (
+            <img
+              ref={imgRef}
+              src={src}
+              alt={alt}
+              className={`${className} ${!isLoaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              onClick={onClick}
+              style={{ display: isLoaded ? 'block' : 'none' }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+};
 
 export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   const { generationBatches, removeBatch, updateImageFeedback } = useAIGenerationStore();
@@ -488,7 +605,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                     >
                       {/* 图像 */}
                       <div className="relative overflow-hidden">
-                        <img
+                        <LazyImage
                           src={item.imageUrl}
                           alt={batch.prompt}
                           className={`
@@ -631,11 +748,12 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
             )}
 
             {/* 图片 */}
-            <img
+            <LazyImage
               src={selectedImage}
               alt="预览"
               className="max-w-full max-h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e?.stopPropagation()}
+              priority={true}
             />
 
             {/* 关闭按钮 */}

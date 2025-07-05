@@ -20,6 +20,10 @@ export interface Generation {
   status: 'pending' | 'completed' | 'failed';
   created_at: string;
   is_public: boolean;
+  // 🔥 新增：R2存储相关字段
+  original_image_urls?: string[]; // 原始临时URL（备用）
+  r2_keys?: string[];             // R2存储的key数组
+  r2_data?: any;                  // R2存储的元数据（JSON格式）
 }
 
 export interface PromptStats {
