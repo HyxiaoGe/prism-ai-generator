@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { parsePromptFeatures } from '../features/ai-models/utils/promptParser';
+import type { GenerationResult } from '../types';
 
 interface ImageGridProps {
   viewMode: 'grid' | 'masonry';
+  onRegenerate?: (batch: any) => void; // 新增：重新生成回调（批次级别）
 }
 
-export function ImageGrid({ viewMode }: ImageGridProps) {
+export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   const { generationBatches, removeBatch } = useAIGenerationStore();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -209,6 +211,12 @@ export function ImageGrid({ viewMode }: ImageGridProps) {
     }
   };
 
+  // 处理批次重新生成
+  const handleBatchRegenerate = (batch: any) => {
+    if (!onRegenerate) return;
+    onRegenerate(batch);
+  };
+
   // 渲染批次标题的简化版本
   const renderBatchTitle = (batch: any) => {
     const features = parsePromptFeatures(batch.prompt, batch.config);
@@ -310,6 +318,13 @@ export function ImageGrid({ viewMode }: ImageGridProps) {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
+                    onClick={() => handleBatchRegenerate(batch)}
+                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    title="重新生成这批图片"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleCopyPrompt(batch.prompt)}
                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                     title="复制提示词"
@@ -383,6 +398,7 @@ export function ImageGrid({ viewMode }: ImageGridProps) {
                                 setSelectedBatchId(batch.id);
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+                              title="查看大图"
                             >
                               <Maximize2 className="w-5 h-5 text-gray-700" />
                             </button>
@@ -392,6 +408,7 @@ export function ImageGrid({ viewMode }: ImageGridProps) {
                                 handleDownload(item.imageUrl, `ai-generated-${batch.createdAt.getTime()}-${index}.png`);
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+                              title="下载图片"
                             >
                               <Download className="w-5 h-5 text-gray-700" />
                             </button>
@@ -401,6 +418,7 @@ export function ImageGrid({ viewMode }: ImageGridProps) {
                                 // 分享功能
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+                              title="分享图片"
                             >
                               <Share2 className="w-5 h-5 text-gray-700" />
                             </button>

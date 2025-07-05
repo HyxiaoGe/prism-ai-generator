@@ -13,6 +13,8 @@ export interface GenerationConfig {
   height?: number;
   steps?: number;
   guidance?: number;
+  // 新增：解析出的特征信息，用于智能标签回填
+  parsedFeatures?: any;
 }
 
 // 生成结果

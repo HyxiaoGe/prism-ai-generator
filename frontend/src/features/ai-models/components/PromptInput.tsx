@@ -9,6 +9,7 @@ interface PromptInputProps {
   initialPrompt?: string;
   compact?: boolean;
   suggestedTags?: any;
+  parsedFeatures?: any; // 新增：解析出的特征信息，用于自动选择标签
 }
 
 // 艺术风格组（单选 - 避免风格冲突）- 扩充版
@@ -159,7 +160,7 @@ const getDisplayValue = (value: string, tagGroups: any[]): string => {
   return value; // 如果找不到，返回原值
 };
 
-export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', compact = false, suggestedTags }: PromptInputProps) {
+export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', compact = false, suggestedTags, parsedFeatures }: PromptInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -199,6 +200,102 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     setIsQualityEnhanced(false);
     setSelectedTemplate('');
   }, [initialPrompt]);
+
+  // 🎯 智能标签解析 - 根据parsedFeatures自动选择对应的标签
+  useEffect(() => {
+    if (!parsedFeatures) return;
+    
+    console.log('🏷️ 开始智能标签设置:', parsedFeatures);
+    
+    // 辅助函数：根据标签显示值查找对应的value
+    const findTagValueByLabel = (label: string, tagGroups: any[]): string => {
+      for (const group of tagGroups) {
+        const tag = group.find((tag: any) => tag.displayValue === label || tag.label === label);
+        if (tag) return tag.value;
+      }
+      return '';
+    };
+    
+    // 设置艺术风格（单选）
+    if (parsedFeatures.artStyle) {
+      const artStyleValue = findTagValueByLabel(parsedFeatures.artStyle.label, [ART_STYLE_TAGS]);
+      if (artStyleValue) {
+        setSelectedArtStyle(artStyleValue);
+        console.log('🎨 设置艺术风格:', parsedFeatures.artStyle.label, '→', artStyleValue);
+      }
+    }
+    
+    // 设置主题风格（单选）
+    if (parsedFeatures.themeStyle) {
+      const themeStyleValue = findTagValueByLabel(parsedFeatures.themeStyle.label, [THEME_STYLE_TAGS]);
+      if (themeStyleValue) {
+        setSelectedThemeStyle(themeStyleValue);
+        console.log('🏗️ 设置主题风格:', parsedFeatures.themeStyle.label, '→', themeStyleValue);
+      }
+    }
+    
+    // 设置情绪氛围（单选）
+    if (parsedFeatures.mood) {
+      const moodValue = findTagValueByLabel(parsedFeatures.mood.label, [MOOD_TAGS]);
+      if (moodValue) {
+        setSelectedMood(moodValue);
+        console.log('😊 设置情绪氛围:', parsedFeatures.mood.label, '→', moodValue);
+      }
+    }
+    
+    // 设置增强效果（多选）
+    if (parsedFeatures.enhancements && parsedFeatures.enhancements.length > 0) {
+      const enhancementValues: string[] = [];
+      const technicalValues: string[] = [];
+      const compositionValues: string[] = [];
+      
+      for (const enhancement of parsedFeatures.enhancements) {
+        // 先在增强效果中查找
+        const enhancementValue = findTagValueByLabel(enhancement.label, [ENHANCEMENT_TAGS]);
+        if (enhancementValue) {
+          enhancementValues.push(enhancementValue);
+          continue;
+        }
+        
+        // 在技术参数中查找
+        const technicalValue = findTagValueByLabel(enhancement.label, [TECHNICAL_TAGS]);
+        if (technicalValue) {
+          technicalValues.push(technicalValue);
+          continue;
+        }
+        
+        // 在构图参数中查找
+        const compositionValue = findTagValueByLabel(enhancement.label, [COMPOSITION_TAGS]);
+        if (compositionValue) {
+          compositionValues.push(compositionValue);
+        }
+      }
+      
+      if (enhancementValues.length > 0) {
+        setSelectedEnhancements(enhancementValues);
+        console.log('✨ 设置增强效果:', enhancementValues);
+      }
+      
+      if (technicalValues.length > 0) {
+        setSelectedTechnical(technicalValues);
+        console.log('📷 设置技术参数:', technicalValues);
+      }
+      
+      if (compositionValues.length > 0) {
+        setSelectedComposition(compositionValues);
+        console.log('📐 设置构图参数:', compositionValues);
+      }
+    }
+    
+    // 设置品质增强
+    if (parsedFeatures.qualityEnhanced) {
+      setIsQualityEnhanced(true);
+      console.log('💎 设置品质增强: true');
+    }
+    
+    console.log('✅ 智能标签设置完成');
+    
+  }, [parsedFeatures]);
 
   // 当suggestedTags变化时应用推荐标签
   useEffect(() => {

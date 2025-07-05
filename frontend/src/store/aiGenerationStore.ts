@@ -53,6 +53,7 @@ interface AIGenerationState {
   updateUsageStats: () => Promise<void>;
   loadHistoryFromDatabase: () => Promise<void>; // 新增：从数据库加载历史记录
   setLoading: (loading: boolean) => void;
+  prepareRegeneration: (result: GenerationResult) => Promise<void>; // 新增：准备重新生成
 }
 
 const initialGenerationStatus: GenerationStatus = {
@@ -437,6 +438,76 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           console.error('❌ 从数据库加载历史记录失败:', error);
           // 即使出错也要清除加载状态
           set({ isLoading: false }, false, 'setLoading');
+        }
+      },
+
+      prepareRegeneration: async (result: GenerationResult) => {
+        try {
+          console.log('🔄 准备重新生成，原始配置:', result.config);
+          
+          // 从结果中提取配置
+          const originalConfig = result.config;
+          
+          // 获取可用模型列表
+          const { availableModels } = get();
+          if (availableModels.length === 0) {
+            // 如果还没有加载模型列表，先加载
+            const models = await import('../features/ai-models/services/aiService').then(m => m.AIService.getAvailableModels());
+            get().setAvailableModels(models);
+          }
+          
+          // 查找对应的模型
+          const targetModel = get().availableModels.find(m => m.id === originalConfig.model);
+          
+          // 🎯 智能解析提示词 - 提取基础描述和标签信息
+          const { parsePromptFeatures } = await import('../features/ai-models/utils/promptParser');
+          const parsedFeatures = parsePromptFeatures(result.prompt, originalConfig);
+          
+          console.log('🧠 智能解析结果:', parsedFeatures);
+          
+          // 更新当前配置和选中的模型
+          set(
+            (state) => ({
+              currentConfig: {
+                ...originalConfig,
+                // 🎯 使用解析出的基础提示词，而不是完整的技术标签堆砌
+                prompt: parsedFeatures.basePrompt || result.prompt,
+                // 确保配置完整性，使用默认值补充缺失字段
+                aspectRatio: originalConfig.aspectRatio || '1:1',
+                numOutputs: originalConfig.numOutputs || 4,
+                outputFormat: originalConfig.outputFormat || 'webp',
+                numInferenceSteps: originalConfig.numInferenceSteps || 4,
+                // 🎯 将解析出的标签信息保存，供PromptInput使用
+                parsedFeatures: parsedFeatures,
+              },
+              selectedModel: targetModel || state.availableModels[0] || null,
+            }),
+            false,
+            'prepareRegeneration'
+          );
+          
+          console.log('✅ 智能重新生成配置已准备完成');
+          console.log('📝 基础提示词:', parsedFeatures.basePrompt);
+          console.log('🏷️ 解析的标签:', {
+            artStyle: parsedFeatures.artStyle?.label,
+            themeStyle: parsedFeatures.themeStyle?.label,
+            mood: parsedFeatures.mood?.label,
+            enhancements: parsedFeatures.enhancements.map(e => e.label)
+          });
+          
+        } catch (error) {
+          console.error('❌ 准备重新生成失败:', error);
+          // 即使失败也不阻塞用户操作，使用当前提示词
+          set(
+            (state) => ({
+              currentConfig: {
+                ...state.currentConfig,
+                prompt: result.prompt,
+              }
+            }),
+            false,
+            'prepareRegeneration'
+          );
         }
       },
     }),

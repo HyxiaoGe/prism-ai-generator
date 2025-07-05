@@ -7,6 +7,7 @@ interface SettingsTabsProps {
   initialPrompt?: string;
   disabled?: boolean;
   suggestedTags?: any;
+  parsedFeatures?: any; // 新增：解析出的特征信息
 }
 
 type TabId = 'model' | 'prompt' | 'advanced';
@@ -17,7 +18,7 @@ const tabs = [
   { id: 'advanced' as TabId, label: '高级选项', icon: Sliders },
 ];
 
-export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTags }: SettingsTabsProps) {
+export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTags, parsedFeatures }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('model');
 
   return (
@@ -60,6 +61,7 @@ export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTa
               disabled={disabled}
               compact={true}
               suggestedTags={suggestedTags}
+              parsedFeatures={parsedFeatures}
             />
           </div>
         )}

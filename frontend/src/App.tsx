@@ -9,6 +9,7 @@ import {
 } from './features/ai-models';
 import { ImageGrid } from './components/ImageGrid';
 import { useAIGenerationStore } from './store/aiGenerationStore';
+import type { GenerationResult } from './types';
 
 function App() {
   const { 
@@ -17,8 +18,10 @@ function App() {
     generationBatches, 
     usageStats, 
     isLoading,
+    currentConfig,
     updateUsageStats, 
-    loadHistoryFromDatabase 
+    loadHistoryFromDatabase,
+    prepareRegeneration 
   } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
@@ -90,6 +93,39 @@ function App() {
   const handleNavigationChange = (newMode: 'home' | 'gallery') => {
     setViewMode(newMode);
     setShowSettings(false); // 切换页面时关闭设置面板
+  };
+
+  // 处理批次重新生成
+  const handleRegenerate = async (batch: any) => {
+    try {
+      console.log('🔄 开始重新生成批次，原始配置:', batch);
+      
+      // 从批次中构造一个GenerationResult对象用于prepareRegeneration
+      const result: GenerationResult = {
+        id: `${batch.id}-regenerate`,
+        imageUrl: batch.results[0]?.imageUrl || '',
+        prompt: batch.prompt,
+        config: batch.config,
+        createdAt: batch.createdAt,
+        status: 'completed',
+      };
+      
+      // 准备重新生成配置
+      await prepareRegeneration(result);
+      
+      // 设置侧边栏提示词（使用解析出的基础描述，而不是完整的技术标签）
+      setSidebarPrompt(currentConfig.prompt || batch.prompt);
+      setSuggestedTags(null); // 重新生成不使用推荐标签
+      
+      // 打开设置面板
+      setShowSettings(true);
+      
+      console.log('✅ 批次重新生成配置已准备，设置面板已打开');
+      
+    } catch (error) {
+      console.error('❌ 准备重新生成失败:', error);
+      alert('准备重新生成失败，请重试');
+    }
   };
 
   // 检查是否有内容（使用generationBatches）
@@ -353,7 +389,7 @@ function App() {
             </div>
 
             {generationBatches.length > 0 ? (
-              <ImageGrid viewMode="masonry" />
+              <ImageGrid viewMode="masonry" onRegenerate={handleRegenerate} />
             ) : (
               <div className="text-center py-16">
                 <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -401,7 +437,11 @@ function App() {
             
             {/* 可滚动内容区域 */}
             <div className="flex-1 overflow-y-auto">
-              <SettingsTabs initialPrompt={sidebarPrompt} suggestedTags={suggestedTags} />
+              <SettingsTabs 
+                initialPrompt={sidebarPrompt} 
+                suggestedTags={suggestedTags}
+                parsedFeatures={currentConfig.parsedFeatures}
+              />
             </div>
           </div>
         </div>
