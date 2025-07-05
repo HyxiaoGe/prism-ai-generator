@@ -15,6 +15,17 @@ export interface GenerationConfig {
   guidance?: number;
   // 新增：解析出的特征信息，用于智能标签回填
   parsedFeatures?: any;
+  // 新增：用户选择的标签信息
+  selectedTags?: {
+    artStyle?: string;
+    themeStyle?: string;
+    mood?: string;
+    technical?: string[];
+    composition?: string[];
+    enhancement?: string[];
+    negative?: string[];
+    isQualityEnhanced?: boolean;
+  };
 }
 
 // 生成结果
@@ -25,6 +36,13 @@ export interface GenerationResult {
   config: GenerationConfig;
   createdAt: Date;
   status: 'completed' | 'failed';
+  // 新增：反馈相关字段
+  userFeedback?: {
+    type: 'like' | 'dislike' | null;
+    submittedAt?: Date;
+  };
+  // 新增：真实的数据库generation_id（UUID格式）
+  realGenerationId?: string;
 }
 
 // 生成状态

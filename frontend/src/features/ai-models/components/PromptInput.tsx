@@ -205,8 +205,6 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   useEffect(() => {
     if (!parsedFeatures) return;
     
-    console.log('🏷️ 开始智能标签设置:', parsedFeatures);
-    
     // 辅助函数：根据标签显示值查找对应的value
     const findTagValueByLabel = (label: string, tagGroups: any[]): string => {
       for (const group of tagGroups) {
@@ -221,7 +219,6 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       const artStyleValue = findTagValueByLabel(parsedFeatures.artStyle.label, [ART_STYLE_TAGS]);
       if (artStyleValue) {
         setSelectedArtStyle(artStyleValue);
-        console.log('🎨 设置艺术风格:', parsedFeatures.artStyle.label, '→', artStyleValue);
       }
     }
     
@@ -230,7 +227,6 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       const themeStyleValue = findTagValueByLabel(parsedFeatures.themeStyle.label, [THEME_STYLE_TAGS]);
       if (themeStyleValue) {
         setSelectedThemeStyle(themeStyleValue);
-        console.log('🏗️ 设置主题风格:', parsedFeatures.themeStyle.label, '→', themeStyleValue);
       }
     }
     
@@ -239,7 +235,6 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       const moodValue = findTagValueByLabel(parsedFeatures.mood.label, [MOOD_TAGS]);
       if (moodValue) {
         setSelectedMood(moodValue);
-        console.log('😊 设置情绪氛围:', parsedFeatures.mood.label, '→', moodValue);
       }
     }
     
@@ -273,34 +268,27 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       
       if (enhancementValues.length > 0) {
         setSelectedEnhancements(enhancementValues);
-        console.log('✨ 设置增强效果:', enhancementValues);
       }
       
       if (technicalValues.length > 0) {
         setSelectedTechnical(technicalValues);
-        console.log('📷 设置技术参数:', technicalValues);
       }
       
       if (compositionValues.length > 0) {
         setSelectedComposition(compositionValues);
-        console.log('📐 设置构图参数:', compositionValues);
       }
     }
     
     // 设置品质增强
     if (parsedFeatures.qualityEnhanced) {
       setIsQualityEnhanced(true);
-      console.log('💎 设置品质增强: true');
     }
-    
-    console.log('✅ 智能标签设置完成');
     
   }, [parsedFeatures]);
 
   // 当suggestedTags变化时应用推荐标签
   useEffect(() => {
     if (suggestedTags) {
-      console.log('🎯 应用推荐标签:', suggestedTags);
       
       // 应用艺术风格
       if (suggestedTags.artStyle) {
@@ -505,12 +493,24 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     
     if (!fullPrompt.trim() || disabled) return;
 
+    // 收集所有选择的标签信息
+    const selectedTags = {
+      artStyle: selectedArtStyle || undefined,
+      themeStyle: selectedThemeStyle || undefined,
+      mood: selectedMood || undefined,
+      technical: selectedTechnical.length > 0 ? selectedTechnical : undefined,
+      composition: selectedComposition.length > 0 ? selectedComposition : undefined,
+      enhancement: selectedEnhancements.length > 0 ? selectedEnhancements : undefined,
+      negative: selectedNegative.length > 0 ? selectedNegative : undefined,
+      isQualityEnhanced: isQualityEnhanced || undefined,
+    };
+
     const config: GenerationConfig = {
       ...currentConfig,
       prompt: fullPrompt.trim(),
+      negativePrompt: getNegativePrompt(),
+      selectedTags, // 新增：传递标签信息
     } as GenerationConfig;
-    
-    console.log('🎯 最终生成配置:', config);
 
     // 验证配置
     const validation = await AIService.validateConfig(config);
@@ -525,10 +525,8 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     }
 
     if (onGenerate) {
-      console.log('🚀 调用外部onGenerate回调');
       onGenerate(config);
     } else {
-      console.log('🚀 调用store的startGeneration');
       await startGeneration(config);
     }
   };

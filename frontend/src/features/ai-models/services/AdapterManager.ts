@@ -66,7 +66,7 @@ export class AdapterManager {
    */
   registerAdapter(registry: AdapterRegistry): void {
     this.adapters.set(registry.id, registry);
-    console.log(`📦 适配器已注册: ${registry.metadata.name} v${registry.metadata.version}`);
+
   }
 
   /**
@@ -88,7 +88,7 @@ export class AdapterManager {
     this.activeAdapters.delete(id);
     this.adapters.delete(id);
     
-    console.log(`🗑️ 适配器已取消注册: ${registry.metadata.name}`);
+
     return true;
   }
 
@@ -135,7 +135,7 @@ export class AdapterManager {
       await adapter.initialize();
       this.activeAdapters.set(model.id, adapter);
       
-      console.log(`✅ 适配器已创建: ${model.id} -> ${registry.metadata.name}`);
+  
       return adapter;
     } catch (error) {
       console.error(`❌ 适配器创建失败: ${model.id}`, error);
@@ -196,7 +196,7 @@ export class AdapterManager {
    * 清理所有适配器
    */
   async cleanup(): Promise<void> {
-    console.log('🧹 清理适配器管理器...');
+
     
     for (const [modelId, adapter] of this.activeAdapters) {
       try {
@@ -216,7 +216,7 @@ export class AdapterManager {
     try {
       // 这里可以实现动态加载外部适配器插件的逻辑
       // 例如从远程URL加载ES模块或WebAssembly模块
-      console.log(`🔌 准备加载适配器插件: ${pluginUrl}`);
+  
       
       // 示例：动态导入
       const module = await import(/* webpackIgnore: true */ pluginUrl);
@@ -240,7 +240,7 @@ export class AdapterManager {
           isBuiltIn: false
         });
         
-        console.log(`✅ 插件适配器加载成功: ${metadata.name}`);
+
       } else {
         throw new Error('插件格式不正确');
       }

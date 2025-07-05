@@ -9,7 +9,7 @@ import type {
   GenerationStatus, 
   AIModel 
 } from '../types';
-import type { UserUsageStats } from '../types/database';
+import type { UserUsageStats, TagCategory } from '../types/database';
 
 // 生成批次接口
 interface GenerationBatch {
@@ -19,6 +19,8 @@ interface GenerationBatch {
   results: GenerationResult[];
   createdAt: Date;
   model: string;
+  // 新增：真实的数据库generation_id（UUID格式）
+  realGenerationId?: string;
 }
 
 interface AIGenerationState {
@@ -54,6 +56,8 @@ interface AIGenerationState {
   loadHistoryFromDatabase: () => Promise<void>; // 新增：从数据库加载历史记录
   setLoading: (loading: boolean) => void;
   prepareRegeneration: (result: GenerationResult) => Promise<void>; // 新增：准备重新生成
+  updateImageFeedback: (batchId: string, resultIndex: number, feedback: { type: 'like' | 'dislike' | null, submittedAt?: Date }) => void; // 新增：更新图片反馈
+  loadFeedbackStates: () => Promise<void>; // 新增：加载反馈状态
 }
 
 const initialGenerationStatus: GenerationStatus = {
@@ -115,8 +119,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           return;
         }        
         
+        // 🔥 关键修复：保存完整的生成配置到store
         set(
-          {
+          (state) => ({
             currentGeneration: {
               isGenerating: true,
               progress: 0,
@@ -124,15 +129,14 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               error: null,
               startTime: new Date(),
               estimatedTime: 30000, // Replicate通常20-30秒
-            }
-          },
+            },
+            currentConfig: { ...state.currentConfig, ...config } // 🎯 保存标签信息
+          }),
           false,
           'startGeneration'
         );
 
         try {
-          console.log('🎨 开始生成图像，配置:', config);
-          
           const { updateProgress } = get();
           
           // 智能进度模拟 - 模拟真实AI生成过程
@@ -243,19 +247,233 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             const model = models.find(m => m.id === state.currentConfig.model);
             const modelCost = model?.costPerGeneration || 0;
             
-            await databaseService.saveGeneration({
+            // 将选择的标签转换为数据库所需的格式
+            const tagsUsed = [];
+            const selectedTags = state.currentConfig.selectedTags;
+            
+
+            
+            if (selectedTags) {
+              // 辅助函数：根据标签值获取显示名称
+              const getTagDisplayName = (value: string): string => {
+                const tagNameMap: Record<string, string> = {
+                  // 艺术风格组
+                  'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed': '摄影级逼真',
+                  'cinematic photography, film photography, dramatic lighting, cinematic composition': '电影级画质',
+                  'oil painting, classical art, brush strokes, Renaissance style': '油画风格',
+                  'watercolor painting, soft brushes, artistic, flowing colors': '水彩画',
+                  'anime style, manga, japanese animation, cel shading': '动漫风格',
+                  'pixel art, 8-bit, retro gaming style, pixelated': '像素艺术',
+                  'pencil sketch, black and white, hand drawn, charcoal drawing': '素描风格',
+                  'concept art, digital painting, matte painting, professional illustration': '概念艺术',
+                  '3D render, CGI, ray tracing, volumetric lighting, subsurface scattering': '3D渲染',
+                  'impressionist style, soft focus, painterly, artistic brushwork': '印象派',
+                  
+                  // 主题风格组
+                  'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets': '赛博朋克',
+                  'sci-fi, futuristic, space technology, holographic displays, advanced technology': '科幻场景',
+                  'fantasy, magical, mythical creatures, enchanted forest, mystical atmosphere': '奇幻风格',
+                  'steampunk, vintage machinery, brass gears, Victorian era, industrial': '蒸汽朋克',
+                  'chinese style, traditional, elegant, ink wash painting, oriental aesthetics': '中国风',
+                  'modern, minimalist, clean design, sleek, contemporary': '现代简约',
+                  'retro-futurism, vintage sci-fi, 80s aesthetic, synthwave, vaporwave': '复古未来',
+                  'biophilic design, organic forms, nature-inspired, eco-friendly, sustainable': '自然生态',
+                  'industrial design, metallic textures, concrete, raw materials, urban decay': '工业风格',
+                  'gothic architecture, dark romantic, ornate details, mysterious atmosphere': '哥特风格',
+                  
+                  // 情绪氛围组
+                  'warm lighting, bright, cheerful, golden hour, soft sunlight': '温暖明亮',
+                  'dark, mysterious, moody lighting, deep shadows, dramatic chiaroscuro': '神秘暗黑',
+                  'dreamy, ethereal, soft, beautiful, pastel colors, fairy-tale like': '梦幻唯美',
+                  'epic, dramatic, cinematic, powerful, grand scale, awe-inspiring': '震撼史诗',
+                  'peaceful, calm, serene, tranquil, meditation, zen atmosphere': '宁静平和',
+                  'energetic, dynamic, vibrant, lively, high-energy, action-packed': '活力动感',
+                  'melancholic, contemplative, nostalgic, bittersweet, introspective': '忧郁沉思',
+                  'luxurious, elegant, sophisticated, premium, high-end, glamorous': '奢华高贵',
+                  'wild, primal, untamed, rugged, natural, raw power': '原始野性',
+                  'futuristic, high-tech, digital, cyber, holographic, technological': '未来科技',
+                  
+                  // 技术参数组
+                  '85mm lens, portrait lens, shallow depth of field': '85mm镜头',
+                  'wide-angle lens, 24mm, expansive view, environmental context': '广角镜头',
+                  'macro photography, extreme close-up, intricate details, magnified': '微距摄影',
+                  'telephoto lens, 200mm, compressed perspective, background blur': '长焦镜头',
+                  'fisheye lens, distorted perspective, 180-degree view, curved edges': '鱼眼效果',
+                  'shallow depth of field, f/1.4, bokeh effect, selective focus': '景深控制',
+                  'deep focus, f/11, everything in focus, landscape photography': '全景深',
+                  'golden hour lighting, warm sunlight, magic hour, soft shadows': '黄金时刻',
+                  'blue hour, twilight, evening atmosphere, city lights': '蓝调时刻',
+                  'studio lighting, softbox, professional lighting setup, controlled environment': '工作室灯光',
+                  
+                  // 构图参数组
+                  'rule of thirds, balanced composition, dynamic framing': '三分法则',
+                  'centered composition, symmetrical, balanced, focal point': '中心构图',
+                  'low angle shot, worm eye view, heroic perspective, dramatic angle': '低角度仰拍',
+                  'high angle shot, bird eye view, overhead perspective, aerial view': '高角度俯拍',
+                  'close-up shot, intimate framing, detailed focus, emotional connection': '特写镜头',
+                  'wide shot, establishing shot, environmental context, full scene': '全景镜头',
+                  'medium shot, upper body, conversational framing, portrait style': '肩部特写',
+                  'extreme close-up, macro detail, textural focus, intimate detail': '极近特写',
+                  'dynamic composition, diagonal lines, movement, energy': '动态构图',
+                  'minimalist composition, negative space, clean lines, simple elegance': '极简构图',
+                  
+                  // 增强属性组
+                  'highly detailed, intricate details, ultra-detailed textures, photorealistic details': '超高细节',
+                  'cinematic composition, film photography, movie-like quality, Hollywood style': '电影感',
+                  'professional photography, studio quality, commercial grade, award-winning': '专业摄影',
+                  'masterpiece, award winning, gallery quality, museum piece': '艺术大师',
+                  'volumetric lighting, god rays, atmospheric lighting, light beams': '体积光效',
+                  'color grading, cinematic colors, film look, professional color correction': '色彩分级',
+                  'HDR photography, high dynamic range, enhanced contrast, vivid colors': 'HDR效果',
+                  'film grain, analog photography, vintage film look, organic texture': '胶片质感',
+                  'high quality, detailed, masterpiece, best quality, 4k resolution': '品质增强',
+                  
+                  // 负面提示词组
+                  'blurry, out of focus, motion blur, soft focus': '避免模糊',
+                  'low quality, pixelated, compressed, artifact, noise': '避免低质量',
+                  'distorted, deformed, mutated, disfigured, anatomical errors': '避免变形',
+                  'overexposed, blown out highlights, washed out, too bright': '避免过曝',
+                  'cartoonish, anime, illustration, drawing, painted': '避免卡通化',
+                  'copy paste, repetitive, tiled, pattern artifacts': '避免复制粘贴感',
+                };
+                
+                // 如果找到完全匹配的映射，返回中文名称
+                if (tagNameMap[value]) {
+                  return tagNameMap[value];
+                }
+                
+                // 如果没有完全匹配，尝试部分匹配
+                for (const [englishValue, chineseName] of Object.entries(tagNameMap)) {
+                  if (value.includes(englishValue) || englishValue.includes(value)) {
+                    return chineseName;
+                  }
+                }
+                
+                // 如果都没找到，返回截取的英文值
+                console.warn('⚠️ 未找到标签映射:', value);
+                return value.length > 50 ? value.substring(0, 50) + '...' : value;
+              };
+              
+              // 艺术风格
+              if (selectedTags.artStyle) {
+                tagsUsed.push({
+                  name: getTagDisplayName(selectedTags.artStyle),
+                  category: 'art_style' as const,
+                  value: selectedTags.artStyle
+                });
+              }
+              
+              // 主题风格
+              if (selectedTags.themeStyle) {
+                tagsUsed.push({
+                  name: getTagDisplayName(selectedTags.themeStyle),
+                  category: 'theme_style' as const,
+                  value: selectedTags.themeStyle
+                });
+              }
+              
+              // 情绪氛围
+              if (selectedTags.mood) {
+                tagsUsed.push({
+                  name: getTagDisplayName(selectedTags.mood),
+                  category: 'mood' as const,
+                  value: selectedTags.mood
+                });
+              }
+              
+              // 技术参数
+              if (selectedTags.technical) {
+                selectedTags.technical.forEach(tech => {
+                  tagsUsed.push({
+                    name: getTagDisplayName(tech),
+                    category: 'technical' as const,
+                    value: tech
+                  });
+                });
+              }
+              
+              // 构图参数
+              if (selectedTags.composition) {
+                selectedTags.composition.forEach(comp => {
+                  tagsUsed.push({
+                    name: getTagDisplayName(comp),
+                    category: 'composition' as const,
+                    value: comp
+                  });
+                });
+              }
+              
+              // 增强属性
+              if (selectedTags.enhancement) {
+                selectedTags.enhancement.forEach(enh => {
+                  tagsUsed.push({
+                    name: getTagDisplayName(enh),
+                    category: 'enhancement' as const,
+                    value: enh
+                  });
+                });
+              }
+              
+              // 负面提示词
+              if (selectedTags.negative) {
+                selectedTags.negative.forEach(neg => {
+                  tagsUsed.push({
+                    name: getTagDisplayName(neg),
+                    category: 'negative' as const,
+                    value: neg
+                  });
+                });
+              }
+              
+              // 品质增强
+              if (selectedTags.isQualityEnhanced) {
+                tagsUsed.push({
+                  name: '品质增强',
+                  category: 'enhancement' as const,
+                  value: 'high quality, detailed, masterpiece, best quality, 4k resolution'
+                });
+              }
+            }
+            
+
+            
+            const savedGeneration = await databaseService.saveGeneration({
               prompt: prompt,
               model_name: state.currentConfig.model || 'flux-schnell',
               model_cost: modelCost,
               image_urls: results.map(r => r.imageUrl),
               status: 'completed',
               is_public: true,
+              tags_used: tagsUsed, // 传递标签信息
             });
+
+            // 更新批次和结果的真实 generation_id
+            if (savedGeneration && savedGeneration.id) {
+              // 更新批次的 realGenerationId
+              set((state) => ({
+                generationBatches: state.generationBatches.map(batch => 
+                  batch.id === batchId ? { 
+                    ...batch, 
+                    realGenerationId: savedGeneration.id,
+                    results: batch.results.map(result => ({
+                      ...result,
+                      realGenerationId: savedGeneration.id
+                    }))
+                  } : batch
+                ),
+                // 同步更新 generationHistory
+                generationHistory: state.generationHistory.map(historyItem => 
+                  results.some(result => result.id === historyItem.id) ? {
+                    ...historyItem,
+                    realGenerationId: savedGeneration.id
+                  } : historyItem
+                )
+              }), false, 'updateRealGenerationId');
+              
+            }
 
             // 更新提示词统计
             await databaseService.updatePromptStats(prompt);
-            
-            console.log('✅ 生成记录已保存到数据库');
           } catch (dbError) {
             console.error('❌ 保存生成记录失败:', dbError);
           }
@@ -346,12 +564,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           const records = await databaseService.getUserGenerations();
           
           if (records.length === 0) {
-            console.log('📝 数据库中没有历史记录');
             set({ isLoading: false }, false, 'setLoading');
             return;
           }
-
-          console.log(`📚 从数据库加载了 ${records.length} 条生成记录`);
           
           // 按提示词和时间分组创建批次
           const batchesMap = new Map<string, GenerationBatch>();
@@ -388,7 +603,11 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                   height: 1024,
                   steps: 4,
                   guidance: 7.5,
-                }
+                },
+                // 初始化反馈状态为未设置
+                userFeedback: undefined,
+                // 保存真实的数据库generation_id
+                realGenerationId: record.id
               };
               
               batchResults.push(result);
@@ -408,6 +627,8 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 results: batchResults, // 包含所有图片
                 createdAt: localDate,
                 model: record.model_name,
+                // 保存真实的数据库generation_id
+                realGenerationId: record.id
               };
               batchesMap.set(batchKey, batch);
             } else {
@@ -432,7 +653,10 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             'loadHistoryFromDatabase'
           );
           
-          console.log(`✅ 成功加载 ${batches.length} 个生成批次，共 ${historyResults.length} 张图片`);
+
+          
+          // 异步加载反馈状态
+          get().loadFeedbackStates().catch(console.error);
           
         } catch (error) {
           console.error('❌ 从数据库加载历史记录失败:', error);
@@ -443,8 +667,6 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
       prepareRegeneration: async (result: GenerationResult) => {
         try {
-          console.log('🔄 准备重新生成，原始配置:', result.config);
-          
           // 从结果中提取配置
           const originalConfig = result.config;
           
@@ -459,25 +681,23 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           // 查找对应的模型
           const targetModel = get().availableModels.find(m => m.id === originalConfig.model);
           
-          // 🎯 智能解析提示词 - 提取基础描述和标签信息
+          // 智能解析提示词 - 提取基础描述和标签信息
           const { parsePromptFeatures } = await import('../features/ai-models/utils/promptParser');
           const parsedFeatures = parsePromptFeatures(result.prompt, originalConfig);
-          
-          console.log('🧠 智能解析结果:', parsedFeatures);
           
           // 更新当前配置和选中的模型
           set(
             (state) => ({
               currentConfig: {
                 ...originalConfig,
-                // 🎯 使用解析出的基础提示词，而不是完整的技术标签堆砌
+                // 使用解析出的基础提示词，而不是完整的技术标签堆砌
                 prompt: parsedFeatures.basePrompt || result.prompt,
                 // 确保配置完整性，使用默认值补充缺失字段
                 aspectRatio: originalConfig.aspectRatio || '1:1',
                 numOutputs: originalConfig.numOutputs || 4,
                 outputFormat: originalConfig.outputFormat || 'webp',
                 numInferenceSteps: originalConfig.numInferenceSteps || 4,
-                // 🎯 将解析出的标签信息保存，供PromptInput使用
+                // 将解析出的标签信息保存，供PromptInput使用
                 parsedFeatures: parsedFeatures,
               },
               selectedModel: targetModel || state.availableModels[0] || null,
@@ -485,15 +705,6 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             false,
             'prepareRegeneration'
           );
-          
-          console.log('✅ 智能重新生成配置已准备完成');
-          console.log('📝 基础提示词:', parsedFeatures.basePrompt);
-          console.log('🏷️ 解析的标签:', {
-            artStyle: parsedFeatures.artStyle?.label,
-            themeStyle: parsedFeatures.themeStyle?.label,
-            mood: parsedFeatures.mood?.label,
-            enhancements: parsedFeatures.enhancements.map(e => e.label)
-          });
           
         } catch (error) {
           console.error('❌ 准备重新生成失败:', error);
@@ -508,6 +719,112 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             false,
             'prepareRegeneration'
           );
+        }
+      },
+
+      updateImageFeedback: (batchId, resultIndex, feedback) => 
+        set(
+          (state) => ({
+            generationBatches: state.generationBatches.map(batch => {
+              if (batch.id === batchId) {
+                return {
+                  ...batch,
+                  results: batch.results.map((result, index) => {
+                    if (index === resultIndex) {
+                      return {
+                        ...result,
+                        userFeedback: feedback.type ? {
+                          type: feedback.type,
+                          submittedAt: feedback.submittedAt || new Date()
+                        } : undefined
+                      };
+                    }
+                    return result;
+                  })
+                };
+              }
+              return batch;
+            }),
+            // 同步更新 generationHistory 以保持兼容性
+            generationHistory: state.generationHistory.map(historyItem => {
+              // 找到对应的批次和结果
+              const batch = state.generationBatches.find(b => b.id === batchId);
+              if (batch && batch.results[resultIndex]?.id === historyItem.id) {
+                return {
+                  ...historyItem,
+                  userFeedback: feedback.type ? {
+                    type: feedback.type,
+                    submittedAt: feedback.submittedAt || new Date()
+                  } : undefined
+                };
+              }
+              return historyItem;
+            })
+          }),
+          false,
+          'updateImageFeedback'
+        ),
+
+      loadFeedbackStates: async () => {
+        try {
+          const databaseService = DatabaseService.getInstance();
+          const { generationBatches } = get();
+          
+          // 为每个批次的每张图片查询反馈状态
+          const updatedBatches = await Promise.all(
+            generationBatches.map(async (batch) => {
+                             const updatedResults = await Promise.all(
+                 batch.results.map(async (result, index) => {
+                   try {
+                     // 使用真实的 generation_id，如果没有则跳过查询
+                     const generationId = result.realGenerationId || batch.realGenerationId;
+                     
+                     if (!generationId) {
+                       return result;
+                     }
+                     
+                     // 查询这个批次的反馈
+                     const feedbacks = await databaseService.getImageFeedback(generationId);
+                     
+                     if (feedbacks.length > 0) {
+                       const feedback = feedbacks[0]; // 取最新的反馈
+                       return {
+                         ...result,
+                         userFeedback: {
+                           type: feedback.feedback_type,
+                           submittedAt: new Date(feedback.created_at)
+                         }
+                       };
+                     }
+                     
+                     return result;
+                   } catch (error) {
+                     console.error(`❌ 加载图片反馈失败 (${result.imageUrl}):`, error);
+                     return result;
+                   }
+                 })
+               );
+              
+              return {
+                ...batch,
+                results: updatedResults
+              };
+            })
+          );
+          
+          // 更新状态
+          set(
+            (state) => ({
+              generationBatches: updatedBatches,
+              // 同步更新 generationHistory
+              generationHistory: updatedBatches.flatMap(batch => batch.results)
+            }),
+            false,
+            'loadFeedbackStates'
+          );
+          
+        } catch (error) {
+          console.error('❌ 加载反馈状态失败:', error);
         }
       },
     }),

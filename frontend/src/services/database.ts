@@ -4,7 +4,13 @@ import type {
   Generation, 
   PromptStats, 
   DailyStats, 
-  UserUsageStats 
+  UserUsageStats,
+  TagStats,
+  TagCategory,
+  ImageFeedback,
+  FeedbackType,
+  TagRecommendation,
+  PopularTagsAnalysis
 } from '../types/database';
 
 /**
@@ -163,6 +169,16 @@ export class DatabaseService {
   async getUserUsageStats(): Promise<UserUsageStats> {
     const user = await this.getOrCreateUser();
     
+    // 获取用户的反馈统计
+    const { data: feedbackStats } = await supabase
+      .from('image_feedback')
+      .select('feedback_type')
+      .eq('user_id', user.id);
+
+    const likesReceived = feedbackStats?.filter(f => f.feedback_type === 'like').length || 0;
+    const dislikesReceived = feedbackStats?.filter(f => f.feedback_type === 'dislike').length || 0;
+    const feedbackGiven = feedbackStats?.length || 0;
+    
     return {
       daily: {
         used: user.used_today,
@@ -172,6 +188,9 @@ export class DatabaseService {
       total: {
         generated: user.total_generated,
         cost: 0, // 可以从generations表计算
+        likes_received: likesReceived,
+        dislikes_received: dislikesReceived,
+        feedback_given: feedbackGiven,
       },
     };
   }
@@ -248,6 +267,7 @@ export class DatabaseService {
     image_urls: string[];
     status?: 'pending' | 'completed' | 'failed';
     is_public?: boolean;
+    tags_used?: Array<{name: string, category: TagCategory, value: string}>; // 新增：使用的标签
   }): Promise<Generation> {
     const user = await this.getOrCreateUser();
 
@@ -267,6 +287,20 @@ export class DatabaseService {
 
     if (error) {
       throw new Error(`保存生成记录失败: ${error.message}`);
+    }
+
+    // 异步更新每日统计，不阻塞主流程
+    this.updateDailyStats().catch(error => {
+      console.error('更新每日统计失败:', error);
+      // 不抛出错误，避免影响主流程
+    });
+
+    // 异步更新标签使用统计，不阻塞主流程
+    if (generation.tags_used && generation.tags_used.length > 0) {
+      this.updateTagStats(generation.tags_used).catch(error => {
+        console.error('更新标签统计失败:', error);
+        // 不抛出错误，避免影响主流程
+      });
     }
 
     return data;
@@ -378,45 +412,71 @@ export class DatabaseService {
    */
   async updateDailyStats(): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // 获取今日统计数据
+    // 获取今日生成记录统计
     const { data: generationsToday, error: genError } = await supabase
       .from('generations')
-      .select('model_cost')
+      .select('model_cost, user_id, status, created_at, image_urls')
       .gte('created_at', `${today}T00:00:00`)
-      .lt('created_at', `${today}T23:59:59`);
+      .lt('created_at', `${tomorrow}T00:00:00`);
 
     if (genError) {
+      console.error('获取今日生成数据失败:', genError);
       throw new Error(`获取今日生成数据失败: ${genError.message}`);
     }
 
-    const { data: usersToday, error: usersError } = await supabase
-      .from('users')
-      .select('id')
-      .gte('created_at', `${today}T00:00:00`)
-      .lt('created_at', `${today}T23:59:59`);
+    // 只统计完成的记录
+    const completedGenerations = generationsToday?.filter(r => r.status === 'completed') || [];
 
-    if (usersError) {
-      throw new Error(`获取今日用户数据失败: ${usersError.message}`);
+    // 统计今日活跃用户（有生成行为的用户）
+    const uniqueUserIds = new Set(completedGenerations.map(gen => gen.user_id));
+    
+    const totalGenerations = completedGenerations.length;
+    const totalActiveUsers = uniqueUserIds.size;
+    const totalCost = completedGenerations.reduce((sum, gen) => sum + (gen.model_cost || 0), 0);
+
+    // 检查是否已存在今日统计记录
+    const { data: existingStats, error: fetchError } = await supabase
+      .from('daily_stats')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('检查现有统计记录失败:', fetchError);
+      throw new Error(`检查现有统计记录失败: ${fetchError.message}`);
     }
 
-    const totalGenerations = generationsToday?.length || 0;
-    const totalUsers = usersToday?.length || 0;
-    const totalCost = generationsToday?.reduce((sum, gen) => sum + (gen.model_cost || 0), 0) || 0;
+    const statsData = {
+      date: today,
+      total_generations: totalGenerations,
+      total_users: totalActiveUsers,
+      total_cost: totalCost,
+      popular_prompts: [], // 可以后续实现
+    };
 
-    // 更新或创建每日统计
-    const { error: upsertError } = await supabase
-      .from('daily_stats')
-      .upsert({
-        date: today,
-        total_generations: totalGenerations,
-        total_users: totalUsers,
-        total_cost: totalCost,
-        popular_prompts: [], // 可以后续实现
-      });
+    if (existingStats) {
+      // 更新现有记录
+      const { error: updateError } = await supabase
+        .from('daily_stats')
+        .update(statsData)
+        .eq('id', existingStats.id);
 
-    if (upsertError) {
-      throw new Error(`更新每日统计失败: ${upsertError.message}`);
+      if (updateError) {
+        console.error('更新每日统计失败:', updateError);
+        throw new Error(`更新每日统计失败: ${updateError.message}`);
+      }
+    } else {
+      // 创建新记录
+      const { error: insertError } = await supabase
+        .from('daily_stats')
+        .insert(statsData);
+
+      if (insertError) {
+        console.error('创建每日统计失败:', insertError);
+        throw new Error(`创建每日统计失败: ${insertError.message}`);
+      }
     }
   }
 
@@ -436,4 +496,530 @@ export class DatabaseService {
 
     return data || [];
   }
-} 
+
+  /**
+   * 调试方法：获取今日所有生成记录详情
+   */
+  async getDebugGenerationsToday(): Promise<any> {
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('generations')
+      .select('*')
+      .gte('created_at', `${today}T00:00:00`)
+      .lt('created_at', `${tomorrow}T00:00:00`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('获取今日生成记录失败:', error);
+      return [];
+    }
+
+    console.log('🔍 今日所有生成记录:', data);
+    console.log('📊 记录统计:', {
+      总记录数: data?.length || 0,
+      完成记录数: data?.filter(r => r.status === 'completed').length || 0,
+      失败记录数: data?.filter(r => r.status === 'failed').length || 0,
+      待处理记录数: data?.filter(r => r.status === 'pending').length || 0,
+    });
+
+    // 详细分析每条记录
+    data?.forEach((record, index) => {
+      console.log(`📝 记录 ${index + 1}:`, {
+        id: record.id,
+        prompt: record.prompt.substring(0, 50) + '...',
+        model: record.model_name,
+        图片数量: Array.isArray(record.image_urls) ? record.image_urls.length : 1,
+        状态: record.status,
+        创建时间: record.created_at,
+        成本: record.model_cost
+      });
+    });
+
+    return data || [];
+  }
+
+  /**
+   * 清理重复的每日统计记录，保留每天最新的一条
+   */
+  async cleanupDuplicateDailyStats(): Promise<void> {
+    console.log('🧹 开始清理重复的每日统计记录...');
+
+    // 获取所有每日统计记录，按日期分组
+    const { data: allStats, error: fetchError } = await supabase
+      .from('daily_stats')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (fetchError) {
+      throw new Error(`获取每日统计失败: ${fetchError.message}`);
+    }
+
+    if (!allStats || allStats.length === 0) {
+      console.log('📭 没有找到每日统计记录');
+      return;
+    }
+
+    // 按日期分组
+    const statsByDate = new Map<string, any[]>();
+    allStats.forEach(stat => {
+      const date = stat.date;
+      if (!statsByDate.has(date)) {
+        statsByDate.set(date, []);
+      }
+      statsByDate.get(date)!.push(stat);
+    });
+
+    console.log('📊 每日统计记录分组:', Array.from(statsByDate.entries()).map(([date, records]) => ({
+      日期: date,
+      记录数: records.length,
+      是否重复: records.length > 1
+    })));
+
+    // 清理重复记录
+    for (const [date, records] of statsByDate.entries()) {
+      if (records.length > 1) {
+        console.log(`🔍 发现 ${date} 有 ${records.length} 条重复记录，准备清理...`);
+        
+        // 按创建时间排序，保留最新的一条
+        records.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
+        
+        const keepRecord = records[0]; // 保留最新的
+        const deleteRecords = records.slice(1); // 删除其他的
+        
+        console.log(`📌 保留记录:`, {
+          id: keepRecord.id,
+          date: keepRecord.date,
+          total_generations: keepRecord.total_generations,
+          创建时间: keepRecord.created_at
+        });
+        
+        // 删除重复记录
+        for (const record of deleteRecords) {
+          console.log(`🗑️ 删除重复记录:`, {
+            id: record.id,
+            date: record.date,
+            total_generations: record.total_generations,
+            创建时间: record.created_at
+          });
+          
+          const { error: deleteError } = await supabase
+            .from('daily_stats')
+            .delete()
+            .eq('id', record.id);
+          
+          if (deleteError) {
+            console.error(`删除记录 ${record.id} 失败:`, deleteError);
+          } else {
+            console.log(`✅ 已删除记录 ${record.id}`);
+          }
+        }
+      } else {
+        console.log(`✅ ${date} 的记录正常，无需清理`);
+      }
+    }
+
+    console.log('🎉 重复记录清理完成！');
+  }
+
+  // ===== 标签统计相关方法 =====
+
+  /**
+   * 记录标签使用统计
+   */
+  async updateTagStats(tags: Array<{name: string, category: TagCategory, value: string}>): Promise<void> {
+    console.log('📊 更新标签使用统计:', tags);
+
+    for (const tag of tags) {
+      try {
+        // 查找现有标签统计
+        const { data: existing, error: fetchError } = await supabase
+          .from('tag_stats')
+          .select('*')
+          .eq('tag_name', tag.name)
+          .eq('tag_category', tag.category)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error(`获取标签统计失败 [${tag.name}]:`, fetchError);
+          continue;
+        }
+
+        if (existing) {
+          // 更新现有标签统计
+          const { error: updateError } = await supabase
+            .from('tag_stats')
+            .update({
+              usage_count: existing.usage_count + 1,
+              last_used: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (updateError) {
+            console.error(`更新标签统计失败 [${tag.name}]:`, updateError);
+          } else {
+
+          }
+        } else {
+          // 创建新标签统计
+          const { error: insertError } = await supabase
+            .from('tag_stats')
+            .insert({
+              tag_name: tag.name,
+              tag_category: tag.category,
+              tag_value: tag.value,
+              usage_count: 1,
+              success_rate: 0, // 初始成功率为0，等待反馈后计算
+              average_rating: 0,
+              last_used: new Date().toISOString(),
+            });
+
+          if (insertError) {
+            console.error(`创建标签统计失败 [${tag.name}]:`, insertError);
+          } else {
+
+          }
+        }
+      } catch (error) {
+        console.error(`处理标签统计失败 [${tag.name}]:`, error);
+      }
+    }
+  }
+
+  /**
+   * 获取热门标签
+   */
+  async getPopularTags(category?: TagCategory, limit: number = 10): Promise<TagStats[]> {
+    let query = supabase
+      .from('tag_stats')
+      .select('*')
+      .order('usage_count', { ascending: false })
+      .limit(limit);
+
+    if (category) {
+      query = query.eq('tag_category', category);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`获取热门标签失败: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * 获取标签推荐
+   */
+  async getTagRecommendations(usedTags: string[] = [], category?: TagCategory, limit: number = 5): Promise<TagRecommendation[]> {
+    let query = supabase
+      .from('tag_stats')
+      .select('*')
+      .gt('usage_count', 0) // 至少被使用过一次
+      .order('usage_count', { ascending: false })
+      .limit(limit * 2); // 获取更多数据用于过滤
+
+    if (category) {
+      query = query.eq('tag_category', category);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`获取标签推荐失败: ${error.message}`);
+    }
+
+    // 过滤掉已使用的标签，并计算推荐分数
+    const recommendations: TagRecommendation[] = (data || [])
+      .filter(tag => !usedTags.includes(tag.tag_name))
+      .slice(0, limit)
+      .map(tag => {
+        let score = tag.usage_count;
+        let reason = `热门标签 (${tag.usage_count}次使用)`;
+
+        // 根据成功率调整分数
+        if (tag.success_rate > 0.7) {
+          score *= 1.2;
+          reason += ', 高成功率';
+        }
+
+        // 根据平均评分调整分数
+        if (tag.average_rating > 4) {
+          score *= 1.1;
+          reason += ', 高评分';
+        }
+
+        return {
+          tag,
+          score: Math.round(score),
+          reason
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return recommendations;
+  }
+
+  /**
+   * 分析标签趋势
+   */
+  async analyzeTagTrends(days: number = 7): Promise<PopularTagsAnalysis[]> {
+    const categories: TagCategory[] = ['art_style', 'theme_style', 'mood', 'technical', 'composition', 'enhancement'];
+    const results: PopularTagsAnalysis[] = [];
+
+    for (const category of categories) {
+      const { data, error } = await supabase
+        .from('tag_stats')
+        .select('*')
+        .eq('tag_category', category)
+        .order('usage_count', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error(`分析 ${category} 标签趋势失败:`, error);
+        continue;
+      }
+
+      const totalUsage = (data || []).reduce((sum, tag) => sum + tag.usage_count, 0);
+      
+      results.push({
+        category,
+        tags: data || [],
+        total_usage: totalUsage,
+        growth_rate: 0, // 可以后续实现基于时间的增长率计算
+      });
+    }
+
+    return results;
+  }
+
+  // ===== 图片反馈相关方法 =====
+
+  /**
+   * 提交图片反馈
+   */
+  async submitImageFeedback(params: {
+    generationId: string;
+    imageUrls: string[];  // 改为数组
+    feedbackType: FeedbackType;
+    tagsUsed: string[];
+    modelUsed: string;
+  }): Promise<ImageFeedback | null> {
+    const user = await this.getOrCreateUser();
+
+    // 检查是否已经对这个批次提交过反馈
+    const { data: existing, error: checkError } = await supabase
+      .from('image_feedback')
+      .select('*')
+      .eq('generation_id', params.generationId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw new Error(`检查现有反馈失败: ${checkError.message}`);
+    }
+
+    if (existing) {
+      if (params.feedbackType === null) {
+        // 取消反馈 - 删除记录
+        const { error } = await supabase
+          .from('image_feedback')
+          .delete()
+          .eq('id', existing.id);
+
+        if (error) {
+          throw new Error(`删除批次反馈失败: ${error.message}`);
+        }
+
+
+        
+        // 异步更新标签成功率
+        this.updateTagSuccessRates().catch(console.error);
+        
+        return null;
+      } else {
+        // 更新现有反馈
+        const { data, error } = await supabase
+          .from('image_feedback')
+          .update({
+            feedback_type: params.feedbackType,
+            image_urls: params.imageUrls,  // 更新图片URL数组
+            tags_used: params.tagsUsed,
+            model_used: params.modelUsed,
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(`更新批次反馈失败: ${error.message}`);
+        }
+
+
+        
+        // 异步更新标签成功率
+        this.updateTagSuccessRates().catch(console.error);
+        
+        return data;
+      }
+    } else {
+      // 如果是取消反馈，但没有现有反馈，直接返回 null
+      if (params.feedbackType === null) {
+
+        return null;
+      }
+      
+      // 创建新反馈
+      const { data, error } = await supabase
+        .from('image_feedback')
+        .insert({
+          generation_id: params.generationId,
+          user_id: user.id,
+          image_urls: params.imageUrls,  // 使用图片URL数组
+          feedback_type: params.feedbackType,
+          tags_used: params.tagsUsed,
+          model_used: params.modelUsed,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`提交批次反馈失败: ${error.message}`);
+      }
+
+
+      
+      // 异步更新标签成功率
+      this.updateTagSuccessRates().catch(console.error);
+      
+      return data;
+    }
+  }
+
+  /**
+   * 获取批次反馈
+   */
+  async getImageFeedback(generationId: string): Promise<ImageFeedback[]> {
+    const { data, error } = await supabase
+      .from('image_feedback')
+      .select('*')
+      .eq('generation_id', generationId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`获取批次反馈失败: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * 基于反馈更新标签成功率
+   */
+  async updateTagSuccessRates(): Promise<void> {
+
+
+    try {
+      // 获取所有反馈数据，按标签分组统计
+      const { data: feedbacks, error } = await supabase
+        .from('image_feedback')
+        .select('tags_used, feedback_type, image_urls');
+
+      if (error) {
+        throw new Error(`获取反馈数据失败: ${error.message}`);
+      }
+
+      // 统计每个标签的反馈情况
+      const tagFeedbackMap = new Map<string, { likes: number; total: number }>();
+
+      feedbacks?.forEach(feedback => {
+        feedback.tags_used?.forEach((tagName: string) => {
+          if (!tagFeedbackMap.has(tagName)) {
+            tagFeedbackMap.set(tagName, { likes: 0, total: 0 });
+          }
+          
+          const stats = tagFeedbackMap.get(tagName)!;
+          // 每个反馈记录代表一个批次，需要按批次中的图片数量来计算
+          const imageCount = feedback.image_urls?.length || 1;
+          stats.total += imageCount;
+          if (feedback.feedback_type === 'like') {
+            stats.likes += imageCount;
+          }
+        });
+      });
+
+      // 更新每个标签的成功率
+      for (const [tagName, stats] of tagFeedbackMap.entries()) {
+        const successRate = stats.total > 0 ? stats.likes / stats.total : 0;
+        const averageRating = successRate * 5; // 将成功率转换为5分制评分
+
+        const { error: updateError } = await supabase
+          .from('tag_stats')
+          .update({
+            success_rate: successRate,
+            average_rating: averageRating,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('tag_name', tagName);
+
+        if (updateError) {
+          console.error(`更新标签 ${tagName} 成功率失败:`, updateError);
+        } else {
+
+        }
+      }
+
+
+    } catch (error) {
+      console.error('❌ 更新标签成功率失败:', error);
+    }
+  }
+
+  /**
+   * 获取用户反馈统计
+   */
+  async getUserFeedbackStats(userId?: string): Promise<{
+    total_feedback: number;
+    likes_given: number;
+    dislikes_given: number;
+    feedback_rate: number;
+  }> {
+    const user = userId ? await this.getUserById(userId) : await this.getOrCreateUser();
+    
+    if (!user) {
+      return {
+        total_feedback: 0,
+        likes_given: 0,
+        dislikes_given: 0,
+        feedback_rate: 0,
+      };
+    }
+
+    const { data: feedbacks, error } = await supabase
+      .from('image_feedback')
+      .select('feedback_type')
+      .eq('user_id', user.id);
+
+    if (error) {
+      throw new Error(`获取用户反馈统计失败: ${error.message}`);
+    }
+
+    const totalFeedback = feedbacks?.length || 0;
+    const likesGiven = feedbacks?.filter(f => f.feedback_type === 'like').length || 0;
+    const dislikesGiven = feedbacks?.filter(f => f.feedback_type === 'dislike').length || 0;
+    
+    // 计算反馈率（反馈数 / 生成数）
+    const totalGenerated = user.total_generated;
+    const feedbackRate = totalGenerated > 0 ? totalFeedback / totalGenerated : 0;
+
+    return {
+      total_feedback: totalFeedback,
+      likes_given: likesGiven,
+      dislikes_given: dislikesGiven,
+      feedback_rate: feedbackRate,
+    };
+  }
+}

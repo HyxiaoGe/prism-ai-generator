@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { parsePromptFeatures } from '../features/ai-models/utils/promptParser';
+import { DatabaseService } from '../services/database';
 import type { GenerationResult } from '../types';
 
 interface ImageGridProps {
@@ -10,7 +11,7 @@ interface ImageGridProps {
 }
 
 export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
-  const { generationBatches, removeBatch } = useAIGenerationStore();
+  const { generationBatches, removeBatch, updateImageFeedback } = useAIGenerationStore();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set());
@@ -175,7 +176,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
 
     const columnHeights = Array(columnCount).fill(0);
     
-    batchResults.forEach((item, index) => {
+    batchResults.forEach((item: any, index: number) => {
       const columnIndex = index % columnCount;
       const imageHeight = imageHeights[item.imageUrl] || 320;
       columnHeights[columnIndex] += imageHeight + 24;
@@ -215,6 +216,98 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   const handleBatchRegenerate = (batch: any) => {
     if (!onRegenerate) return;
     onRegenerate(batch);
+  };
+
+  // 处理批次反馈（乐观更新）
+  const handleBatchFeedback = async (
+    batchId: string,
+    feedbackType: 'like' | 'dislike'
+  ) => {
+    // 获取当前批次
+    const currentBatch = generationBatches.find(batch => batch.id === batchId);
+    
+    if (!currentBatch) {
+      console.error('找不到对应的生成批次');
+      return;
+    }
+
+    // 检查是否已经有相同的反馈（查看批次中第一张图片的反馈状态）
+    const firstResult = currentBatch.results[0];
+    const existingFeedback = firstResult?.userFeedback?.type;
+    
+    // 如果点击的是相同的反馈类型，则取消反馈
+    const newFeedbackType = existingFeedback === feedbackType ? null : feedbackType;
+    
+    // 🎯 立即更新UI状态（乐观更新）
+    currentBatch.results.forEach((_: any, index: number) => {
+      updateImageFeedback(batchId, index, {
+        type: newFeedbackType,
+        submittedAt: newFeedbackType ? new Date() : undefined
+      });
+    });
+
+    console.log(`✅ 批次反馈状态已更新: ${newFeedbackType}, 包含 ${currentBatch.results.length} 张图片`);
+    
+    // 🚀 在后台异步提交到数据库
+    submitFeedbackToDatabase(currentBatch, newFeedbackType, batchId);
+  };
+
+  // 后台提交反馈到数据库
+  const submitFeedbackToDatabase = async (
+    batch: any,
+    feedbackType: 'like' | 'dislike' | null,
+    batchId: string
+  ) => {
+    try {
+      const dbService = DatabaseService.getInstance();
+      
+      // 从配置中提取标签信息
+      const tagsUsed: string[] = [];
+      const selectedTags = batch.config.selectedTags;
+      if (selectedTags) {
+        if (selectedTags.artStyle) tagsUsed.push(selectedTags.artStyle);
+        if (selectedTags.themeStyle) tagsUsed.push(selectedTags.themeStyle);
+        if (selectedTags.mood) tagsUsed.push(selectedTags.mood);
+        if (selectedTags.technical) tagsUsed.push(...selectedTags.technical);
+        if (selectedTags.composition) tagsUsed.push(...selectedTags.composition);
+        if (selectedTags.enhancement) tagsUsed.push(...selectedTags.enhancement);
+      }
+      
+      // 为整个批次提交反馈
+      const generationId = batch.realGenerationId || batch.id;
+      const imageUrls = batch.results.map((result: any) => result.imageUrl);
+      
+      await dbService.submitImageFeedback({
+        generationId,
+        imageUrls,  // 传递整个批次的图片URL数组
+        feedbackType: feedbackType,
+        tagsUsed,
+        modelUsed: batch.model
+      });
+      
+      console.log(`✅ 批次反馈已提交到数据库: ${feedbackType}, 包含 ${imageUrls.length} 张图片`);
+      
+    } catch (error) {
+      console.error('❌ 提交批次反馈到数据库失败:', error);
+      
+      // 🔄 如果提交失败，回滚UI状态
+      console.warn('⚠️ 反馈提交失败，正在回滚UI状态...');
+      
+      // 获取失败前的状态（与当前状态相反）
+      const rollbackFeedback = feedbackType === 'like' ? 'dislike' : 
+                               feedbackType === 'dislike' ? 'like' : 
+                               feedbackType; // 如果是null，保持null
+      
+             batch.results.forEach((_: any, index: number) => {
+         updateImageFeedback(batchId, index, {
+           type: rollbackFeedback,
+           submittedAt: rollbackFeedback ? new Date() : undefined
+         });
+       });
+      
+      // 可选：显示错误提示
+      // 这里可以添加toast通知用户提交失败
+    }
   };
 
   // 渲染批次标题的简化版本
@@ -313,6 +406,27 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                           {batch.results.length} 张图片
                         </span>
                       </div>
+                      {/* 反馈状态指示器 */}
+                      {(() => {
+                        const batchFeedback = batch.results[0]?.userFeedback?.type;
+                        if (!batchFeedback) return null;
+                        
+                        return (
+                          <div className="flex items-center space-x-1">
+                            {batchFeedback === 'like' ? (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                <ThumbsUp className="w-3 h-3" />
+                                <span>已点赞</span>
+                              </div>
+                            ) : batchFeedback === 'dislike' ? (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                                <ThumbsDown className="w-3 h-3" />
+                                <span>已踩</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -351,7 +465,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
 
             {/* 批次内容 */}
             {!isCollapsed && (
-              <div className="p-6">
+              <div className="p-6 relative">
                 <div
                   ref={gridRef}
                   className={`
@@ -424,9 +538,52 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                             </button>
                           </div>
                         </div>
+
+
                       </div>
                     </div>
                   ))}
+                </div>
+                
+                {/* 批次反馈按钮 - 右下角 */}
+                <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
+                  {(() => {
+                    // 获取批次的整体反馈状态（基于第一张图片的反馈）
+                    const batchFeedback = batch.results[0]?.userFeedback?.type;
+                    
+                    return (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBatchFeedback(batch.id, 'like');
+                          }}
+                          className={`group p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110 ${
+                            batchFeedback === 'like'
+                              ? 'bg-green-500 text-white shadow-green-200' 
+                              : 'bg-white hover:bg-green-50 text-gray-700 border border-gray-200 hover:border-green-300'
+                          }`}
+                          title={batchFeedback === 'like' ? "取消点赞这批图片" : "点赞这批图片"}
+                        >
+                          <ThumbsUp className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBatchFeedback(batch.id, 'dislike');
+                          }}
+                          className={`group p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110 ${
+                            batchFeedback === 'dislike'
+                              ? 'bg-red-500 text-white shadow-red-200' 
+                              : 'bg-white hover:bg-red-50 text-gray-700 border border-gray-200 hover:border-red-300'
+                          }`}
+                          title={batchFeedback === 'dislike' ? "取消踩这批图片" : "踩这批图片"}
+                        >
+                          <ThumbsDown className="w-5 h-5" />
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}

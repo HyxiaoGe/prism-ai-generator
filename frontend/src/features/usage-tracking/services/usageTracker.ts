@@ -88,6 +88,9 @@ export class UsageTracker {
         total: {
           generated: 0,
           cost: 0,
+          likes_received: 0,
+          dislikes_received: 0,
+          feedback_given: 0,
         },
       };
 

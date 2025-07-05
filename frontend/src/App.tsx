@@ -9,6 +9,7 @@ import {
 } from './features/ai-models';
 import { ImageGrid } from './components/ImageGrid';
 import { useAIGenerationStore } from './store/aiGenerationStore';
+import { DatabaseService } from './services/database';
 import type { GenerationResult } from './types';
 
 function App() {
@@ -28,6 +29,216 @@ function App() {
   const [searchPrompt, setSearchPrompt] = useState('');
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
+
+  // 添加调试方法到全局 window 对象
+  useEffect(() => {
+    const debugDatabase = async () => {
+      const dbService = DatabaseService.getInstance();
+      await dbService.getDebugGenerationsToday();
+    };
+    
+    const cleanupDatabase = async () => {
+      const dbService = DatabaseService.getInstance();
+      await dbService.cleanupDuplicateDailyStats();
+    };
+
+    const debugTags = async () => {
+      const dbService = DatabaseService.getInstance();
+      console.log('🏷️ 获取热门标签...');
+      const popularTags = await dbService.getPopularTags();
+      console.log('📊 热门标签:', popularTags);
+      
+      console.log('📈 分析标签趋势...');
+      const trends = await dbService.analyzeTagTrends();
+      console.log('📈 标签趋势分析:', trends);
+    };
+
+    const debugFeedback = async () => {
+      const dbService = DatabaseService.getInstance();
+      console.log('👍👎 获取用户反馈统计...');
+      const feedbackStats = await dbService.getUserFeedbackStats();
+      console.log('📊 反馈统计:', feedbackStats);
+    };
+    
+    // 新增：模拟标签使用的调试方法
+    const simulateTagUsage = async () => {
+      const dbService = DatabaseService.getInstance();
+      console.log('🧪 模拟标签使用...');
+      
+      // 模拟一些标签使用
+      const mockTags = [
+        { name: '摄影级逼真', category: 'art_style' as const, value: 'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed' },
+        { name: '赛博朋克', category: 'theme_style' as const, value: 'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets' },
+        { name: '温暖明亮', category: 'mood' as const, value: 'warm lighting, bright, cheerful, golden hour, soft sunlight' },
+        { name: '超高细节', category: 'enhancement' as const, value: 'highly detailed, intricate details, ultra-detailed textures, photorealistic details' },
+      ];
+      
+      try {
+        await dbService.updateTagStats(mockTags);
+        console.log('✅ 模拟标签使用完成');
+        
+        // 立即查看更新后的统计
+        const updatedTags = await dbService.getPopularTags();
+        console.log('📊 更新后的热门标签:', updatedTags);
+        
+        alert('模拟标签使用完成！现在您可以在数据库中看到标签统计了。');
+      } catch (error) {
+        console.error('❌ 模拟标签使用失败:', error);
+        alert('模拟标签使用失败，请查看控制台');
+      }
+    };
+    
+    // 新增：更新标签名称的方法
+    const updateTagNames = async () => {
+      const dbService = DatabaseService.getInstance();
+      console.log('🔄 开始更新标签名称为中文...');
+      
+      try {
+        // 获取 Supabase 客户端
+        const supabase = (dbService as any).supabase;
+        
+        // 定义标签名称映射
+        const tagNameUpdates = [
+          // 艺术风格组
+          { old: 'concept art, digital painting, matte painting, professional illustration', new: '概念艺术' },
+          { old: 'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed', new: '摄影级逼真' },
+          { old: 'cinematic photography, film photography, dramatic lighting, cinematic composition', new: '电影级画质' },
+          { old: 'oil painting, classical art, brush strokes, Renaissance style', new: '油画风格' },
+          { old: 'watercolor painting, soft brushes, artistic, flowing colors', new: '水彩画' },
+          { old: 'anime style, manga, japanese animation, cel shading', new: '动漫风格' },
+          { old: '3D render, CGI, ray tracing, volumetric lighting, subsurface scattering', new: '3D渲染' },
+          
+          // 主题风格组
+          { old: 'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets', new: '赛博朋克' },
+          { old: 'sci-fi, futuristic, space technology, holographic displays, advanced technology', new: '科幻场景' },
+          { old: 'fantasy, magical, mythical creatures, enchanted forest, mystical atmosphere', new: '奇幻风格' },
+          { old: 'steampunk, vintage machinery, brass gears, Victorian era, industrial', new: '蒸汽朋克' },
+          { old: 'chinese style, traditional, elegant, ink wash painting, oriental aesthetics', new: '中国风' },
+          
+          // 情绪氛围组
+          { old: 'warm lighting, bright, cheerful, golden hour, soft sunlight', new: '温暖明亮' },
+          { old: 'dark, mysterious, moody lighting, deep shadows, dramatic chiaroscuro', new: '神秘暗黑' },
+          { old: 'dreamy, ethereal, soft, beautiful, pastel colors, fairy-tale like', new: '梦幻唯美' },
+          { old: 'epic, dramatic, cinematic, powerful, grand scale, awe-inspiring', new: '震撼史诗' },
+          { old: 'peaceful, calm, serene, tranquil, meditation, zen atmosphere', new: '宁静平和' },
+          
+          // 增强属性组
+          { old: 'highly detailed, intricate details, ultra-detailed textures, photorealistic details', new: '超高细节' },
+          { old: 'high quality, detailed, masterpiece, best quality, 4k resolution', new: '品质增强' },
+          { old: 'HDR photography, high dynamic range, enhanced contrast, vivid colors', new: 'HDR效果' },
+          { old: 'masterpiece, award winning, gallery quality, museum piece', new: '艺术大师' },
+        ];
+        
+        let updatedCount = 0;
+        
+        // 逐个更新标签名称
+        for (const update of tagNameUpdates) {
+          const { data, error } = await supabase
+            .from('tag_stats')
+            .update({ tag_name: update.new })
+            .eq('tag_name', update.old);
+          
+          if (error) {
+            console.error(`❌ 更新标签失败 "${update.old}" -> "${update.new}":`, error);
+          } else {
+            console.log(`✅ 更新标签成功: "${update.old}" -> "${update.new}"`);
+            updatedCount++;
+          }
+        }
+        
+        console.log(`🎉 标签名称更新完成，共更新 ${updatedCount} 个标签`);
+        
+        // 查看更新后的结果
+        const { data: allTags, error: queryError } = await supabase
+          .from('tag_stats')
+          .select('tag_name, tag_category, usage_count, success_rate')
+          .order('usage_count', { ascending: false });
+        
+        if (queryError) {
+          console.error('❌ 查询更新后的标签失败:', queryError);
+        } else {
+          console.log('📊 更新后的标签列表:', allTags);
+        }
+        
+        alert(`标签名称更新完成！共更新了 ${updatedCount} 个标签。请查看数据库中的结果。`);
+        
+      } catch (error) {
+        console.error('❌ 更新标签名称失败:', error);
+        alert('更新标签名称失败，请查看控制台');
+      }
+    };
+    
+    // 新增：测试反馈功能的调试方法
+    const testFeedback = async () => {
+      const dbService = DatabaseService.getInstance();
+      console.log('🧪 测试批次反馈功能...');
+      
+      try {
+        // 模拟一个批次的反馈（4张图片）
+        const batchId = 'test-batch-' + Date.now();
+        const imageUrls = [
+          'https://example.com/test-image-1.jpg',
+          'https://example.com/test-image-2.jpg', 
+          'https://example.com/test-image-3.jpg',
+          'https://example.com/test-image-4.jpg'
+        ];
+        
+        // 为整个批次提交反馈（使用新的API）
+        await dbService.submitImageFeedback({
+          generationId: batchId,
+          imageUrls: imageUrls,  // 传递整个批次的图片URL数组
+          feedbackType: 'like',
+          tagsUsed: ['测试艺术风格', '测试主题风格', '测试情绪氛围'],
+          modelUsed: 'flux-schnell'
+        });
+        
+        console.log(`✅ 测试批次反馈提交成功 (${imageUrls.length}张图片)`);
+        
+        // 查看反馈统计
+        const feedbackStats = await dbService.getUserFeedbackStats();
+        console.log('📊 当前反馈统计:', feedbackStats);
+        
+        // 查看提交的反馈记录
+        const feedbacks = await dbService.getImageFeedback(batchId);
+        console.log('📋 提交的反馈记录:', feedbacks);
+        
+        alert(`批次反馈功能测试完成！已为${imageUrls.length}张图片提交了批次反馈。请查看控制台和数据库。`);
+        
+      } catch (error) {
+        console.error('❌ 测试批次反馈功能失败:', error);
+        alert('测试批次反馈功能失败，请查看控制台');
+      }
+    };
+    
+    // 将调试方法挂载到全局
+    (window as any).debugDatabase = debugDatabase;
+    (window as any).cleanupDatabase = cleanupDatabase;
+    (window as any).debugTags = debugTags;
+    (window as any).debugFeedback = debugFeedback;
+    (window as any).simulateTagUsage = simulateTagUsage;
+    (window as any).updateTagNames = updateTagNames;
+    (window as any).testFeedback = testFeedback;
+    
+    console.log('🔧 调试方法已挂载:');
+    console.log('- debugDatabase() - 查看今日生成记录');
+    console.log('- cleanupDatabase() - 清理重复的每日统计记录');
+    console.log('- debugTags() - 查看标签统计和趋势');
+    console.log('- debugFeedback() - 查看用户反馈统计');
+    console.log('- simulateTagUsage() - 模拟标签使用（测试功能）');
+    console.log('- updateTagNames() - 更新数据库中的标签名称为中文');
+    console.log('- testFeedback() - 测试批次反馈功能');
+    
+    return () => {
+      // 清理时移除全局方法
+      delete (window as any).debugDatabase;
+      delete (window as any).cleanupDatabase;
+      delete (window as any).debugTags;
+      delete (window as any).debugFeedback;
+      delete (window as any).simulateTagUsage;
+      delete (window as any).updateTagNames;
+      delete (window as any).testFeedback;
+    };
+  }, []);
 
   // 初始化应用数据
   useEffect(() => {
@@ -98,8 +309,6 @@ function App() {
   // 处理批次重新生成
   const handleRegenerate = async (batch: any) => {
     try {
-      console.log('🔄 开始重新生成批次，原始配置:', batch);
-      
       // 从批次中构造一个GenerationResult对象用于prepareRegeneration
       const result: GenerationResult = {
         id: `${batch.id}-regenerate`,
@@ -113,14 +322,15 @@ function App() {
       // 准备重新生成配置
       await prepareRegeneration(result);
       
+      // 获取更新后的配置，使用解析出的基础提示词
+      const { currentConfig: updatedConfig } = useAIGenerationStore.getState();
+      
       // 设置侧边栏提示词（使用解析出的基础描述，而不是完整的技术标签）
-      setSidebarPrompt(currentConfig.prompt || batch.prompt);
+      setSidebarPrompt(updatedConfig.prompt || batch.prompt);
       setSuggestedTags(null); // 重新生成不使用推荐标签
       
       // 打开设置面板
       setShowSettings(true);
-      
-      console.log('✅ 批次重新生成配置已准备，设置面板已打开');
       
     } catch (error) {
       console.error('❌ 准备重新生成失败:', error);

@@ -118,10 +118,7 @@ export class AIService {
       const adapter = await this.adapterManager.createAdapter(model);
       
       // 使用适配器生成图像
-      console.log(`🎨 使用 ${adapter.getMetadata().name} 生成图像...`);
       const results = await adapter.generateImage(config);
-      
-      console.log('✅ 图像生成成功:', results);
       return results;
 
     } catch (error) {
