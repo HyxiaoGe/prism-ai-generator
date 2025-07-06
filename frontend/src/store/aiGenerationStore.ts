@@ -294,13 +294,6 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
                   // 🔥 优先使用publicUrl，其次使用签名URL，最后使用原始URL
                   const bestUrl = r2Result.publicUrl || r2Result.url || result.imageUrl;
-                  
-                  console.log(`🖼️ 图片 ${index + 1} URL更新:`, {
-                    原始URL: result.imageUrl,
-                    公共URL: r2Result.publicUrl || '未配置',
-                    签名URL: r2Result.url ? '已生成' : '未生成',
-                    最终使用: bestUrl
-                  });
 
                   return {
                     ...result,

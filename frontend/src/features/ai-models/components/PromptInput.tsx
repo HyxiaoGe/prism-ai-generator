@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
+import { PromptAssistant } from './PromptAssistant';
 import type { GenerationConfig } from '../../../types';
 
 interface PromptInputProps {
@@ -10,6 +11,18 @@ interface PromptInputProps {
   compact?: boolean;
   suggestedTags?: any;
   parsedFeatures?: any; // 新增：解析出的特征信息，用于自动选择标签
+}
+
+interface ParsedPromptResult {
+  coreText: string;
+  artStyle?: string;
+  themeStyle?: string;
+  mood?: string;
+  technical: string[];
+  composition: string[];
+  enhancements: string[];
+  qualityEnhanced: boolean;
+  fullOptimizedPrompt?: string; // 🔥 新增：保留完整的优化提示词
 }
 
 // 艺术风格组（单选 - 避免风格冲突）- 扩充版
@@ -182,9 +195,20 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   const [showAdvanced, setShowAdvanced] = useState(false); // 是否显示高级选项
   const [showTemplates, setShowTemplates] = useState(false); // 是否显示场景模板
   const [selectedTemplate, setSelectedTemplate] = useState(''); // 选中的场景模板
+  const [showAIAssistant, setShowAIAssistant] = useState(false); // 是否显示AI助手
+  const [aiSuggestedTags, setAiSuggestedTags] = useState<any>({}); // AI建议的标签
+  const [aiState, setAiState] = useState({ isAnalyzing: false, isOptimizing: false }); // AI状态
+  const [hasAnalysisResult, setHasAnalysisResult] = useState(false); // 是否已有分析结果
+  const [fullOptimizedPrompt, setFullOptimizedPrompt] = useState<string | null>(null); // 🔥 保存完整的优化提示词
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { startGeneration, currentConfig } = useAIGenerationStore();
+
+  // 🌐 新增：翻译相关状态
+  const [showTranslation, setShowTranslation] = useState(false); // 是否显示翻译
+  const [translation, setTranslation] = useState<any>(null); // 翻译结果
+  const [isTranslating, setIsTranslating] = useState(false); // 翻译状态
+  const [triggerAnalysis, setTriggerAnalysis] = useState(false); // 触发分析标志
 
   // 当initialPrompt变化时更新prompt
   useEffect(() => {
@@ -373,6 +397,12 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     const value = e.target.value;
     setPrompt(value);
     
+    // 🔥 用户手动修改提示词时，清空优化提示词（因为不再适用）
+    if (fullOptimizedPrompt) {
+      setFullOptimizedPrompt(null);
+      console.log('🔥 用户手动修改提示词，清空优化提示词');
+    }
+    
     // 自动调整文本框高度
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -480,18 +510,324 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     setSelectedNegative([]);
     setIsQualityEnhanced(false);
     setSelectedTemplate('');
+    setAiSuggestedTags({});
+    setHasAnalysisResult(false); // 重置分析状态
+    setFullOptimizedPrompt(null); // 🔥 清空完整优化提示词
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
   };
 
+  // 处理AI助手按钮点击
+  const handleAIAssistantToggle = () => {
+    const newShowState = !showAIAssistant;
+    setShowAIAssistant(newShowState);
+    
+    // 🎯 当用户点击显示AI助手时，如果有提示词但没有分析结果，主动触发分析
+    if (newShowState && prompt.trim() && !hasAnalysisResult && !aiState.isAnalyzing) {
+      console.log('🤖 用户打开AI助手，准备自动分析提示词:', prompt);
+      // 通过设置一个标志来触发分析
+      setTriggerAnalysis(true);
+    }
+  };
+
+  // 🌐 新增：处理翻译功能
+  const handleTranslation = async () => {
+    if (!fullOptimizedPrompt || isTranslating) return;
+    
+    setIsTranslating(true);
+    try {
+      const response = await fetch('/.netlify/functions/translate-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          englishPrompt: fullOptimizedPrompt
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setTranslation(result);
+        setShowTranslation(true);
+      }
+    } catch (error) {
+      console.error('翻译失败:', error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // 处理AI建议的标签
+  const handleAITagSuggestions = (suggestedTags: any) => {
+    setAiSuggestedTags(suggestedTags);
+    
+    // 根据AI建议自动选择相应的标签
+    if (suggestedTags.artStyle) {
+      const matchingTag = ART_STYLE_TAGS.find(tag => 
+        tag.label.includes(suggestedTags.artStyle) || 
+        tag.value.toLowerCase().includes(suggestedTags.artStyle.toLowerCase())
+      );
+      if (matchingTag) setSelectedArtStyle(matchingTag.value);
+    }
+    
+    if (suggestedTags.mood) {
+      const matchingTag = MOOD_TAGS.find(tag => 
+        tag.label.includes(suggestedTags.mood) || 
+        tag.value.toLowerCase().includes(suggestedTags.mood.toLowerCase())
+      );
+      if (matchingTag) setSelectedMood(matchingTag.value);
+    }
+    
+    if (suggestedTags.technical && Array.isArray(suggestedTags.technical)) {
+      const matchingTags = TECHNICAL_TAGS.filter(tag =>
+        suggestedTags.technical.some((tech: string) => 
+          tag.value.toLowerCase().includes(tech.toLowerCase())
+        )
+      );
+      setSelectedTechnical(matchingTags.map(tag => tag.value));
+    }
+    
+    if (suggestedTags.enhancement && Array.isArray(suggestedTags.enhancement)) {
+      const matchingTags = ENHANCEMENT_TAGS.filter(tag =>
+        suggestedTags.enhancement.some((enh: string) => 
+          tag.value.toLowerCase().includes(enh.toLowerCase())
+        )
+      );
+      setSelectedEnhancements(matchingTags.map(tag => tag.value));
+    }
+  };
+
+  // 改进AI标签映射函数
+  const mapAITagToFrontendValue = (aiTag: string, tagGroup: any[]): string | null => {
+    if (!aiTag || !tagGroup || tagGroup.length === 0) return null;
+    
+    const aiTagLower = aiTag.toLowerCase().trim();
+    
+    // 1. 精确匹配标签的 label 或 displayValue
+    for (const tag of tagGroup) {
+      if (tag.label.toLowerCase() === aiTagLower || 
+          tag.displayValue?.toLowerCase() === aiTagLower) {
+        console.log('🎯 精确匹配:', aiTag, '->', tag.value);
+        return tag.value;
+      }
+    }
+    
+    // 2. 检查 AI 标签是否包含在 value 中（完全匹配）
+    for (const tag of tagGroup) {
+      if (tag.value.toLowerCase().includes(aiTagLower)) {
+        console.log('🎯 完全包含匹配:', aiTag, '->', tag.value);
+        return tag.value;
+      }
+    }
+    
+    // 3. 关键词匹配 - 检查是否有共同的关键词
+    const aiKeywords = aiTagLower.split(/[,\s]+/).filter(word => word.length > 2);
+    
+    for (const tag of tagGroup) {
+      const tagKeywords = tag.value.toLowerCase().split(/[,\s]+/).filter((word: string) => word.length > 2);
+      const labelKeywords = tag.label.toLowerCase().split(/[,\s]+/).filter((word: string) => word.length > 2);
+      
+      // 计算关键词匹配率
+      let matchCount = 0;
+      for (const aiKeyword of aiKeywords) {
+        if (tagKeywords.some((tagKeyword: string) => 
+            tagKeyword.includes(aiKeyword) || aiKeyword.includes(tagKeyword)) ||
+            labelKeywords.some((labelKeyword: string) => 
+            labelKeyword.includes(aiKeyword) || aiKeyword.includes(labelKeyword))) {
+          matchCount++;
+        }
+      }
+      
+      // 如果匹配率超过50%，认为是匹配的
+      const matchRate = matchCount / aiKeywords.length;
+      if (matchRate >= 0.5 && matchCount >= 1) {
+        console.log('🎯 关键词匹配:', aiTag, '->', tag.value, `(匹配率: ${(matchRate * 100).toFixed(1)}%)`);
+        return tag.value;
+      }
+    }
+    
+    // 4. 部分匹配 - 检查任何一个词的包含关系
+    for (const tag of tagGroup) {
+      for (const aiKeyword of aiKeywords) {
+        if (aiKeyword.length > 3 && (
+            tag.value.toLowerCase().includes(aiKeyword) ||
+            tag.label.toLowerCase().includes(aiKeyword) ||
+            tag.displayValue?.toLowerCase().includes(aiKeyword)
+        )) {
+          console.log('🎯 部分匹配:', aiTag, '->', tag.value, `(关键词: ${aiKeyword})`);
+          return tag.value;
+        }
+      }
+    }
+    
+    console.log('❌ 未找到匹配:', aiTag, '在', tagGroup.map(t => t.label));
+    return null;
+  };
+
+  // 🔧 AI技术参数数组映射函数  
+  const mapAITechnicalArray = (aiTechnical: string[]): string[] => {
+    const mappedValues: string[] = [];
+    for (const aiTag of aiTechnical) {
+      const mappedValue = mapAITagToFrontendValue(aiTag, TECHNICAL_TAGS);
+      if (mappedValue && !mappedValues.includes(mappedValue)) {
+        mappedValues.push(mappedValue);
+      }
+    }
+    return mappedValues;
+  };
+
+  // 🔧 AI增强参数数组映射函数
+  const mapAIEnhancementArray = (aiEnhancements: string[]): string[] => {
+    const mappedValues: string[] = [];
+    for (const aiTag of aiEnhancements) {
+      const mappedValue = mapAITagToFrontendValue(aiTag, ENHANCEMENT_TAGS);
+      if (mappedValue && !mappedValues.includes(mappedValue)) {
+        mappedValues.push(mappedValue);
+      }
+    }
+    return mappedValues;
+  };
+
+  // 🔥 新增：映射AI构图参数数组
+  const mapAICompositionArray = (aiComposition: string[]): string[] => {
+    const mappedValues: string[] = [];
+    for (const aiTag of aiComposition) {
+      const mappedValue = mapAITagToFrontendValue(aiTag, COMPOSITION_TAGS);
+      if (mappedValue && !mappedValues.includes(mappedValue)) {
+        mappedValues.push(mappedValue);
+      }
+    }
+    return mappedValues;
+  };
+
+  // 处理AI优化的智能应用（修复版）
+  const handleAIOptimizationApply = (parsedResult: ParsedPromptResult) => {
+    console.log('🎯 应用AI优化解析结果:', parsedResult);
+    
+    // 🎯 设置核心文本（这是必须的）
+    setPrompt(parsedResult.coreText || '');
+    
+    // 🔥 保存完整的优化提示词，供生成时使用
+    setFullOptimizedPrompt(parsedResult.fullOptimizedPrompt || null);
+    console.log('🔥 保存完整优化提示词:', parsedResult.fullOptimizedPrompt);
+    
+    // 🔧 映射AI标签到前端完整value（改进版）
+    const mappedArtStyle = parsedResult.artStyle ? mapAITagToFrontendValue(parsedResult.artStyle, ART_STYLE_TAGS) : null;
+    const mappedThemeStyle = parsedResult.themeStyle ? mapAITagToFrontendValue(parsedResult.themeStyle, THEME_STYLE_TAGS) : null; // 🔥 新增
+    const mappedMood = parsedResult.mood ? mapAITagToFrontendValue(parsedResult.mood, MOOD_TAGS) : null;
+    const mappedTechnical = parsedResult.technical ? mapAITechnicalArray(parsedResult.technical) : [];
+    const mappedComposition = parsedResult.composition ? mapAICompositionArray(parsedResult.composition) : []; // 🔥 新增
+    const mappedEnhancements = parsedResult.enhancements ? mapAIEnhancementArray(parsedResult.enhancements) : [];
+    
+    console.log('🔧 AI标签映射结果:', {
+      原始: { 
+        artStyle: parsedResult.artStyle, 
+        themeStyle: parsedResult.themeStyle, // 🔥 新增
+        mood: parsedResult.mood, 
+        technical: parsedResult.technical, 
+        composition: parsedResult.composition, // 🔥 新增
+        enhancements: parsedResult.enhancements 
+      },
+      映射: { 
+        artStyle: mappedArtStyle, 
+        themeStyle: mappedThemeStyle, // 🔥 新增
+        mood: mappedMood, 
+        technical: mappedTechnical, 
+        composition: mappedComposition, // 🔥 新增
+        enhancements: mappedEnhancements 
+      }
+    });
+    
+    // 🎯 检查是否有有效的映射结果
+    const hasValidMappedTags = mappedArtStyle || mappedThemeStyle || mappedMood || 
+                              mappedTechnical.length > 0 || mappedComposition.length > 0 || mappedEnhancements.length > 0;
+    
+    if (hasValidMappedTags) {
+      console.log('🏷️ AI提供了有效标签，清空现有标签并应用映射后的标签');
+      
+      // 清空所有现有标签选择
+      setSelectedArtStyle('');
+      setSelectedThemeStyle('');
+      setSelectedMood('');
+      setSelectedTechnical([]);
+      setSelectedComposition([]);
+      setSelectedEnhancements([]);
+      setIsQualityEnhanced(false);
+      
+      // 设置映射后的标签
+      if (mappedArtStyle) {
+        setSelectedArtStyle(mappedArtStyle);
+        console.log('🎨 设置艺术风格:', mappedArtStyle);
+      }
+      
+      if (mappedThemeStyle) { // 🔥 新增主题风格映射
+        setSelectedThemeStyle(mappedThemeStyle);
+        console.log('🏛️ 设置主题风格:', mappedThemeStyle);
+      }
+      
+      if (mappedMood) {
+        setSelectedMood(mappedMood);
+        console.log('😊 设置情绪氛围:', mappedMood);
+      }
+      
+      if (mappedTechnical.length > 0) {
+        setSelectedTechnical(mappedTechnical);
+        console.log('📷 设置技术参数:', mappedTechnical);
+      }
+      
+      if (mappedComposition.length > 0) { // 🔥 新增构图参数映射
+        setSelectedComposition(mappedComposition);
+        console.log('🖼️ 设置构图参数:', mappedComposition);
+      }
+      
+      if (mappedEnhancements.length > 0) {
+        setSelectedEnhancements(mappedEnhancements);
+        console.log('✨ 设置效果增强:', mappedEnhancements);
+      }
+      
+      if (parsedResult.qualityEnhanced) {
+        setIsQualityEnhanced(true);
+        console.log('🚀 启用质量增强');
+      }
+    } else {
+      console.log('⚠️ AI标签映射失败或无有效标签，保留现有标签选择');
+    }
+    
+    // 🔥 强制重新渲染标签显示，确保UI同步
+    setTimeout(() => {
+      console.log('🔄 强制重新渲染后的标签状态:', {
+        artStyle: selectedArtStyle,
+        themeStyle: selectedThemeStyle,
+        mood: selectedMood,
+        technical: selectedTechnical,
+        composition: selectedComposition,
+        enhancements: selectedEnhancements,
+        qualityEnhanced: isQualityEnhanced
+      });
+    }, 100);
+    
+    // 调整文本框高度
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 0);
+    }
+  };
+
   // 开始生成
   const handleGenerate = async () => {
-    const fullPrompt = getFullPrompt();
-    console.log('🎯 PromptInput开始生成，fullPrompt:', fullPrompt);
-    console.log('🎯 currentConfig:', currentConfig);
+    // 🔥 优先使用完整的优化提示词，如果没有则使用组合后的提示词
+    const effectivePrompt = fullOptimizedPrompt || getFullPrompt();
+    console.log('🎯 PromptInput开始生成');
+    console.log('🔥 使用提示词:', effectivePrompt);
+    console.log('🔥 是否使用优化提示词:', fullOptimizedPrompt ? '是' : '否');
     
-    if (!fullPrompt.trim() || disabled) return;
+    if (!effectivePrompt.trim() || disabled) return;
 
     // 收集所有选择的标签信息
     const selectedTags = {
@@ -505,12 +841,26 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       isQualityEnhanced: isQualityEnhanced || undefined,
     };
 
+    // 🔥 详细调试信息
+    console.log('📊 详细的标签收集状态:');
+    console.log('🎨 艺术风格 (selectedArtStyle):', selectedArtStyle);
+    console.log('🏛️ 主题风格 (selectedThemeStyle):', selectedThemeStyle);
+    console.log('😊 情绪氛围 (selectedMood):', selectedMood);
+    console.log('📷 技术参数 (selectedTechnical):', selectedTechnical);
+    console.log('🖼️ 构图参数 (selectedComposition):', selectedComposition);
+    console.log('✨ 增强效果 (selectedEnhancements):', selectedEnhancements);
+    console.log('🚫 负面提示词 (selectedNegative):', selectedNegative);
+    console.log('💎 品质增强 (isQualityEnhanced):', isQualityEnhanced);
+    console.log('🎯 最终selectedTags对象:', selectedTags);
+
     const config: GenerationConfig = {
       ...currentConfig,
-      prompt: fullPrompt.trim(),
+      prompt: effectivePrompt.trim(), // 🔥 使用有效提示词（优化提示词或组合提示词）
       negativePrompt: getNegativePrompt(),
       selectedTags, // 新增：传递标签信息
     } as GenerationConfig;
+
+    console.log('🔥 最终生成配置 (config):', config);
 
     // 验证配置
     const validation = await AIService.validateConfig(config);
@@ -585,11 +935,11 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
           onClick={() => setShowAdvanced(!showAdvanced)}
           className={`px-3 py-1 text-sm rounded-lg transition-colors ${
             showAdvanced
-              ? 'bg-indigo-500 text-white'
-              : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+              ? 'bg-red-500 text-white'
+              : 'bg-red-100 text-red-700 hover:bg-red-200'
           }`}
         >
-          {showAdvanced ? '⚙️ 隐藏高级' : '⚙️ 高级选项'}
+          {showAdvanced ? '🚫 隐藏负面词' : '🚫 负面提示词'}
         </button>
         
         <button
@@ -601,6 +951,20 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
           }`}
         >
           {isQualityEnhanced ? '✅ 已增强' : '✨ 增强品质'}
+        </button>
+        
+        <button
+          onClick={handleAIAssistantToggle}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 shadow-sm border-2 ${
+            showAIAssistant
+              ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white border-purple-400 shadow-lg scale-105'
+              : 'bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 border-purple-300 hover:shadow-md hover:scale-102'
+          }`}
+        >
+          <span className="flex items-center gap-1">
+            🤖 {showAIAssistant ? '隐藏AI助手' : 'AI智能助手'}
+            {!showAIAssistant && <span className="text-xs bg-purple-200 text-purple-800 px-1 rounded">NEW</span>}
+          </span>
         </button>
         
         <button
@@ -620,7 +984,50 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
             {showFullPrompt ? '👁️ 隐藏预览' : '👁️ 预览完整'}
           </button>
         )}
+        
+        {/* 🌐 翻译提示词按钮 */}
+        {fullOptimizedPrompt && (
+          <button
+            onClick={() => setShowTranslation(!showTranslation)}
+            className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+          >
+            {showTranslation ? '🌐 隐藏翻译' : '🌐 翻译提示词'}
+          </button>
+        )}
       </div>
+
+      {/* 🌐 翻译结果显示 */}
+      {showTranslation && fullOptimizedPrompt && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-blue-700 font-medium">🌐 中文翻译</div>
+            <button
+              onClick={handleTranslation}
+              disabled={isTranslating}
+              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+            >
+              {isTranslating ? '翻译中...' : translation ? '重新翻译' : '获取翻译'}
+            </button>
+          </div>
+          
+          {translation ? (
+            <div className="bg-white p-3 rounded border">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {translation.chineseTranslation}
+              </p>
+              {translation.explanation && (
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 {translation.explanation}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <div className="text-sm">点击"获取翻译"查看英文提示词的中文含义</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 完整提示词预览 */}
       {showFullPrompt && hasEnhancements && (
@@ -643,7 +1050,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
             )}
             {selectedThemeStyle && (
               <div className="text-xs">
-                <span className="text-purple-600 font-medium">🌟 主题风格：</span>
+                <span className="text-purple-600 font-medium">🏛️ 主题风格：</span>
                 <span className="text-gray-600">{getDisplayValue(selectedThemeStyle, [THEME_STYLE_TAGS])}</span>
               </div>
             )}
@@ -759,7 +1166,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       {/* 主题风格组（单选） */}
       <div className={compact ? "space-y-2" : "space-y-3"}>
         <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🌟 主题风格 <span className="text-xs text-gray-500">(单选)</span></h4>
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🏛️ 主题风格 <span className="text-xs text-gray-500">(单选)</span></h4>
           {selectedThemeStyle && (
             <span className="text-xs text-purple-600">已选择</span>
           )}
@@ -831,61 +1238,61 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         </div>
       </div>
 
+      {/* 技术参数组（可多选） */}
+      <div className={compact ? "space-y-2" : "space-y-3"}>
+        <div className="flex items-center justify-between">
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>📷 技术参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
+          {selectedTechnical.length > 0 && (
+            <span className="text-xs text-blue-600">已选择 {selectedTechnical.length} 个</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {TECHNICAL_TAGS.map((tag, index) => (
+            <button
+              key={index}
+              onClick={() => toggleTechnical(tag.value)}
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
+                selectedTechnical.includes(tag.value)
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {tag.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 构图参数组（可多选） */}
+      <div className={compact ? "space-y-2" : "space-y-3"}>
+        <div className="flex items-center justify-between">
+          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🖼️ 构图参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
+          {selectedComposition.length > 0 && (
+            <span className="text-xs text-teal-600">已选择 {selectedComposition.length} 个</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {COMPOSITION_TAGS.map((tag, index) => (
+            <button
+              key={index}
+              onClick={() => toggleComposition(tag.value)}
+              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
+                selectedComposition.includes(tag.value)
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {tag.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 高级选项组 */}
       {showAdvanced && (
-        <div className="space-y-6 p-4 bg-indigo-50/50 rounded-xl border border-indigo-200">
-          <div className="text-sm font-medium text-indigo-800 mb-4">⚙️ 高级选项</div>
+        <div className="space-y-6 p-4 bg-red-50/50 rounded-xl border border-red-200">
+          <div className="text-sm font-medium text-red-800 mb-4">🚫 负面提示词（高级）</div>
           
-          {/* 技术参数组（可多选） */}
-          <div className={compact ? "space-y-2" : "space-y-3"}>
-            <div className="flex items-center justify-between">
-              <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>📷 技术参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
-              {selectedTechnical.length > 0 && (
-                <span className="text-xs text-blue-600">已选择 {selectedTechnical.length} 个</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {TECHNICAL_TAGS.map((tag, index) => (
-                <button
-                  key={index}
-                  onClick={() => toggleTechnical(tag.value)}
-                  className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                    selectedTechnical.includes(tag.value)
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 构图参数组（可多选） */}
-          <div className={compact ? "space-y-2" : "space-y-3"}>
-            <div className="flex items-center justify-between">
-              <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🖼️ 构图参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
-              {selectedComposition.length > 0 && (
-                <span className="text-xs text-teal-600">已选择 {selectedComposition.length} 个</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {COMPOSITION_TAGS.map((tag, index) => (
-                <button
-                  key={index}
-                  onClick={() => toggleComposition(tag.value)}
-                  className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                    selectedComposition.includes(tag.value)
-                      ? 'bg-teal-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* 负面提示词组（可多选） */}
           <div className={compact ? "space-y-2" : "space-y-3"}>
             <div className="flex items-center justify-between">
@@ -923,13 +1330,47 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         </div>
       )}
 
+      {/* AI智能助手 */}
+      {showAIAssistant && (
+        <PromptAssistant
+          prompt={getFullPrompt()}
+          onPromptChange={setPrompt}
+          selectedModel={currentConfig?.model || 'flux-schnell'}
+          onTagsChange={handleAITagSuggestions}
+          onApplyOptimization={handleAIOptimizationApply}
+          onAIStateChange={setAiState}
+          onAnalysisComplete={(hasResult) => {
+            setHasAnalysisResult(hasResult);
+            setTriggerAnalysis(false);
+          }}
+          triggerAnalysis={triggerAnalysis}
+          className="mt-6"
+        />
+      )}
+
       {/* 生成按钮 */}
       <button
         onClick={handleGenerate}
-        disabled={!fullPrompt.trim() || disabled}
+        disabled={!fullPrompt.trim() || disabled || aiState.isAnalyzing || aiState.isOptimizing}
         className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-medium rounded-xl transition-all duration-200 disabled:cursor-not-allowed"
       >
-        😊 开始生成
+        {aiState.isAnalyzing ? (
+          <div className="flex items-center justify-center">
+            <svg className="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            AI分析中...
+          </div>
+        ) : aiState.isOptimizing ? (
+          <div className="flex items-center justify-center">
+            <svg className="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            AI优化中...
+          </div>
+        ) : (
+          '😊 开始生成'
+        )}
       </button>
       
       <div className="text-center text-xs text-gray-500">
