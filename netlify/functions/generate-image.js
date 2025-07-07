@@ -221,10 +221,17 @@ function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, output
 }
 
 async function pollPrediction(predictionId, apiToken) {
-  const maxAttempts = 60; // 最多等待5分钟
-  const pollInterval = 5000; // 5秒轮询一次
+  const maxAttempts = 18; // 最多等待54秒（适应60秒超时）
+  const pollInterval = 3000; // 3秒轮询一次，更频繁检查
+  const startTime = Date.now();
+  const maxWaitTime = 55000; // 55秒超时保护
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // 检查是否超过总时间限制
+    if (Date.now() - startTime > maxWaitTime) {
+      throw new Error('Function即将超时，请稍后重试');
+    }
+
     try {
       const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
         headers: {
@@ -237,9 +244,11 @@ async function pollPrediction(predictionId, apiToken) {
       }
 
       const prediction = await response.json();
-      console.log(`🔄 轮询 ${attempt}/${maxAttempts}, 状态: ${prediction.status}`);
+      const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+      console.log(`🔄 轮询 ${attempt}/${maxAttempts}, 状态: ${prediction.status}, 已等待: ${elapsedSeconds}s`);
 
       if (prediction.status === 'succeeded') {
+        console.log(`✅ 生成完成，总耗时: ${elapsedSeconds}s`);
         return prediction;
       }
 
@@ -251,17 +260,23 @@ async function pollPrediction(predictionId, apiToken) {
         throw new Error('生成被取消');
       }
 
-      // 等待后重试
+      // 如果还在处理中，等待后重试
+      if (prediction.status === 'starting' || prediction.status === 'processing') {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      // 未知状态，等待后重试
       await new Promise(resolve => setTimeout(resolve, pollInterval));
 
     } catch (error) {
-      if (attempt === maxAttempts) {
+      if (attempt === maxAttempts || Date.now() - startTime > maxWaitTime) {
         throw error;
       }
       console.log(`⚠️ 轮询出错，重试中... ${error.message}`);
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 错误时等待短一些
     }
   }
 
-  throw new Error('生成超时，请重试');
+  throw new Error('生成超时，请稍后重试。某些复杂图像可能需要更长时间。');
 }

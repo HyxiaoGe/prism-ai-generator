@@ -11,6 +11,12 @@ export class AIService {
    */
   static async generateImage(config: GenerationConfig): Promise<GenerationResult[]> {
     try {
+      // 创建AbortController用于超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 65000); // 65秒超时，比后端60秒稍长
+
       const response = await fetch(`${API_BASE_URL}/generate-image`, {
         method: 'POST',
         headers: {
@@ -23,7 +29,10 @@ export class AIService {
           numInferenceSteps: config.numInferenceSteps,
           outputFormat: config.outputFormat,
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`网络错误: ${response.status}`);
@@ -47,6 +56,17 @@ export class AIService {
 
     } catch (error) {
       console.error('图像生成错误:', error);
+      
+      // 处理不同类型的错误
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('生成超时，请稍后重试。复杂图像可能需要更长时间。');
+        }
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('网络连接失败，请检查网络连接后重试。');
+        }
+      }
+      
       throw error;
     }
   }

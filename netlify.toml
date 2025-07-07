@@ -8,6 +8,9 @@
 [functions]
   # Functions目录
   directory = "netlify/functions"
+  
+  # 增加超时时间到60秒（适合AI生成）
+  timeout = 60
 
 [[headers]]
   # 为所有路径设置CORS头
