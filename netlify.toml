@@ -8,8 +8,9 @@
 [functions]
   # Functions目录
   directory = "netlify/functions"
-  
-  # 增加超时时间到60秒（适合AI生成）
+
+# 为所有functions设置60秒超时
+[functions."*"]
   timeout = 60
 
 [[headers]]
