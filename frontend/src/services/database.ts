@@ -326,6 +326,8 @@ export class DatabaseService {
         original_image_urls: generation.original_image_urls,
         r2_keys: generation.r2_keys,
         r2_data: generation.r2_data,
+        // 🔥 修复：保存标签信息
+        tags_used: generation.tags_used || null,
       })
       .select()
       .single();
@@ -357,7 +359,7 @@ export class DatabaseService {
   async getUserGenerations(limit: number = 50): Promise<Generation[]> {
     const user = await this.getOrCreateUser();
 
-    // 🔒 安全优化：只查询必要字段，不暴露敏感信息
+    // 🔒 安全优化：只查询必要字段，不暴露敏感信息，🔥 包含标签信息用于显示
     const { data, error } = await supabase
       .from('generations')
       .select(`
@@ -372,7 +374,8 @@ export class DatabaseService {
         is_public,
         original_image_urls,
         r2_keys,
-        r2_data
+        r2_data,
+        tags_used
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -420,7 +423,7 @@ export class DatabaseService {
     const totalPages = Math.ceil(total / limit);
     const hasMore = page < totalPages;
 
-    // 获取分页数据
+    // 获取分页数据，🔥 包含标签信息用于显示
     const { data, error } = await supabase
       .from('generations')
       .select(`
@@ -435,7 +438,8 @@ export class DatabaseService {
         is_public,
         original_image_urls,
         r2_keys,
-        r2_data
+        r2_data,
+        tags_used
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -460,7 +464,7 @@ export class DatabaseService {
    * 获取公开的生成记录（用于画廊）
    */
   async getPublicGenerations(limit: number = 100): Promise<Generation[]> {
-    // 🔒 安全优化：公开画廊不暴露用户敏感信息，使用匿名user_id
+    // 🔒 安全优化：公开画廊不暴露用户敏感信息，使用匿名user_id，🔥 包含标签信息用于显示
     const { data, error } = await supabase
       .from('generations')
       .select(`
@@ -473,7 +477,8 @@ export class DatabaseService {
         is_public,
         original_image_urls,
         r2_keys,
-        r2_data
+        r2_data,
+        tags_used
       `)
       .eq('is_public', true)
       .eq('status', 'completed')
@@ -527,7 +532,7 @@ export class DatabaseService {
     const totalPages = Math.ceil(total / limit);
     const hasMore = page < totalPages;
 
-    // 获取分页数据
+    // 获取分页数据，🔥 包含标签信息用于显示
     const { data, error } = await supabase
       .from('generations')
       .select(`
@@ -540,7 +545,8 @@ export class DatabaseService {
         is_public,
         original_image_urls,
         r2_keys,
-        r2_data
+        r2_data,
+        tags_used
       `)
       .eq('is_public', true)
       .eq('status', 'completed')

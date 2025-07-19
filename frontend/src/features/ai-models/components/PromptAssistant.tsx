@@ -313,8 +313,8 @@ export const PromptAssistant: React.FC<PromptAssistantProps> = ({
         const result = await optimizer.analyzePrompt(promptText);
         setAnalysis(result);
         
-        // 🎯 智能优化提醒 - 如果总体评分低于60分，显示优化建议
-        if (result.overall < 60) {
+        // 🎯 智能优化提醒 - 如果总体评分低于90分，显示优化建议
+        if (result.overall < 90) {
           setShowOptimizationSuggestion(true);
         } else {
           setShowOptimizationSuggestion(false);
