@@ -175,8 +175,8 @@ export class DatabaseService {
       .select('feedback_type')
       .eq('user_id', user.id);
 
-    const likesReceived = feedbackStats?.filter(f => f.feedback_type === 'like').length || 0;
-    const dislikesReceived = feedbackStats?.filter(f => f.feedback_type === 'dislike').length || 0;
+    const likesReceived = feedbackStats?.filter((f: any) => f.feedback_type === 'like').length || 0;
+    const dislikesReceived = feedbackStats?.filter((f: any) => f.feedback_type === 'dislike').length || 0;
     const feedbackGiven = feedbackStats?.length || 0;
     
     return {
@@ -448,7 +448,7 @@ export class DatabaseService {
     }
 
     // 为公开记录添加匿名user_id和默认model_cost
-    return (data || []).map(record => ({
+    return (data || []).map((record: any) => ({
       ...record,
       user_id: 'anonymous', // 匿名用户ID
       model_cost: 0, // 不暴露成本信息
@@ -517,7 +517,7 @@ export class DatabaseService {
     console.log(`✅ 公开画廊分页加载完成: ${data?.length || 0}/${total}条记录, 第${page}/${totalPages}页`);
 
     // 为公开记录添加匿名user_id和默认model_cost
-    const mappedData = (data || []).map(record => ({
+    const mappedData = (data || []).map((record: any) => ({
       ...record,
       user_id: 'anonymous', // 匿名用户ID
       model_cost: 0, // 不暴露成本信息
@@ -614,14 +614,14 @@ export class DatabaseService {
     }
 
     // 只统计完成的记录
-    const completedGenerations = generationsToday?.filter(r => r.status === 'completed') || [];
+    const completedGenerations = generationsToday?.filter((r: any) => r.status === 'completed') || [];
 
     // 统计今日活跃用户（有生成行为的用户）
-    const uniqueUserIds = new Set(completedGenerations.map(gen => gen.user_id));
+    const uniqueUserIds = new Set(completedGenerations.map((gen: any) => gen.user_id));
     
     const totalGenerations = completedGenerations.length;
     const totalActiveUsers = uniqueUserIds.size;
-    const totalCost = completedGenerations.reduce((sum, gen) => sum + (gen.model_cost || 0), 0);
+    const totalCost = completedGenerations.reduce((sum: number, gen: any) => sum + (gen.model_cost || 0), 0);
 
     // 检查是否已存在今日统计记录
     const { data: existingStats, error: fetchError } = await supabase
@@ -706,13 +706,13 @@ export class DatabaseService {
     console.log('🔍 今日所有生成记录:', data);
     console.log('📊 记录统计:', {
       总记录数: data?.length || 0,
-      完成记录数: data?.filter(r => r.status === 'completed').length || 0,
-      失败记录数: data?.filter(r => r.status === 'failed').length || 0,
-      待处理记录数: data?.filter(r => r.status === 'pending').length || 0,
+      完成记录数: data?.filter((r: any) => r.status === 'completed').length || 0,
+      失败记录数: data?.filter((r: any) => r.status === 'failed').length || 0,
+      待处理记录数: data?.filter((r: any) => r.status === 'pending').length || 0,
     });
 
     // 详细分析每条记录
-    data?.forEach((record, index) => {
+    data?.forEach((record: any, index: number) => {
       console.log(`📝 记录 ${index + 1}:`, {
         id: record.id,
         prompt: record.prompt.substring(0, 50) + '...',
@@ -750,7 +750,7 @@ export class DatabaseService {
 
     // 按日期分组
     const statsByDate = new Map<string, any[]>();
-    allStats.forEach(stat => {
+    allStats.forEach((stat: any) => {
       const date = stat.date;
       if (!statsByDate.has(date)) {
         statsByDate.set(date, []);
@@ -1030,9 +1030,9 @@ export class DatabaseService {
 
     // 过滤掉已使用的标签，并计算推荐分数
     const recommendations: TagRecommendation[] = (data || [])
-      .filter(tag => !usedTags.includes(tag.tag_name))
+      .filter((tag: any) => !usedTags.includes(tag.tag_name))
       .slice(0, limit)
-      .map(tag => {
+      .map((tag: any) => {
         let score = tag.usage_count;
         let reason = `热门标签 (${tag.usage_count}次使用)`;
 
@@ -1054,7 +1054,7 @@ export class DatabaseService {
           reason
         };
       })
-      .sort((a, b) => b.score - a.score);
+      .sort((a: any, b: any) => b.score - a.score);
 
     return recommendations;
   }
@@ -1079,7 +1079,7 @@ export class DatabaseService {
         continue;
       }
 
-      const totalUsage = (data || []).reduce((sum, tag) => sum + tag.usage_count, 0);
+      const totalUsage = (data || []).reduce((sum: number, tag: any) => sum + tag.usage_count, 0);
       
       results.push({
         category,
@@ -1217,7 +1217,7 @@ export class DatabaseService {
     }
 
     // 为反馈记录添加匿名user_id和默认字段
-    return (data || []).map(record => ({
+    return (data || []).map((record: any) => ({
       ...record,
       user_id: 'current_user', // 不暴露真实user_id
       tags_used: [], // 不暴露标签信息
@@ -1255,7 +1255,7 @@ export class DatabaseService {
     // 按generation_id分组
     const feedbackMap = new Map<string, ImageFeedback[]>();
     
-    (data || []).forEach(record => {
+    (data || []).forEach((record: any) => {
       const feedback: ImageFeedback = {
         ...record,
         user_id: 'current_user', // 不暴露真实user_id
@@ -1292,7 +1292,7 @@ export class DatabaseService {
       // 统计每个标签的反馈情况
       const tagFeedbackMap = new Map<string, { likes: number; total: number }>();
 
-      feedbacks?.forEach(feedback => {
+      feedbacks?.forEach((feedback: any) => {
         feedback.tags_used?.forEach((tagName: string) => {
           if (!tagFeedbackMap.has(tagName)) {
             tagFeedbackMap.set(tagName, { likes: 0, total: 0 });
@@ -1365,8 +1365,8 @@ export class DatabaseService {
     }
 
     const totalFeedback = feedbacks?.length || 0;
-    const likesGiven = feedbacks?.filter(f => f.feedback_type === 'like').length || 0;
-    const dislikesGiven = feedbacks?.filter(f => f.feedback_type === 'dislike').length || 0;
+    const likesGiven = feedbacks?.filter((f: any) => f.feedback_type === 'like').length || 0;
+    const dislikesGiven = feedbacks?.filter((f: any) => f.feedback_type === 'dislike').length || 0;
     
     // 计算反馈率（反馈数 / 生成数）
     const totalGenerated = user.total_generated;
