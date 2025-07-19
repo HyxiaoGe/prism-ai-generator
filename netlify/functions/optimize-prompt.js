@@ -217,7 +217,7 @@ function parseOptimizationResult(llmResponse, originalPrompt, targetModel) {
       throw new Error('优化结果中缺少optimizedPrompt字段');
     }
 
-    return {
+    const result = {
       optimizedPrompt: parsedResult.optimizedPrompt,
       improvements: parsedResult.improvements || ['AI模型优化'],
       confidence: Math.min(Math.max(parsedResult.confidence || 80, 0), 100),
@@ -225,6 +225,11 @@ function parseOptimizationResult(llmResponse, originalPrompt, targetModel) {
       suggestedTags: parsedResult.suggestedTags || {},
       modelSpecificTips: parsedResult.modelSpecificTips || {}
     };
+
+    // 🔥 验证返回的标签ID是否有效
+    console.log('🏷️ LLM返回的标签建议:', JSON.stringify(parsedResult.suggestedTags, null, 2));
+    
+    return result;
 
   } catch (error) {
     console.error('❌ 解析LLM优化结果失败:', error);
@@ -359,11 +364,25 @@ ${getModelCharacteristics(targetModel, 'en')}${analysisContext}
 - Avoid repetitive content
 ${previousAnalysis ? '- Focus on solving issues found in the analysis' : ''}
 
-**Predefined Professional Tags** (select as needed):
-- Art Styles: photorealistic, cinematic photography, oil painting, anime style, concept art, professional photography
-- Mood/Atmosphere: warm lighting, dark mysterious, dreamy ethereal, epic dramatic, wild primal, cozy warm
-- Technical: 85mm lens, macro photography, golden hour lighting, studio lighting, shallow depth of field
-- Enhancement: highly detailed, masterpiece, volumetric lighting, professional quality, ultra high resolution
+**Complete Predefined Professional Tags System** (必须从这些精确ID中选择):
+
+**艺术风格标签 (单选, 选择最适合的一个)**:
+- photorealistic, cinematic, oil-painting, watercolor, anime, pixel-art, sketch, concept-art, 3d-render, impressionist
+
+**主题风格标签 (单选, 选择最适合的一个)**:
+- cyberpunk, sci-fi, fantasy, steampunk, chinese-style, modern, retro-futurism, nature, industrial, gothic
+
+**情绪氛围标签 (单选, 选择最适合的一个)**:
+- warm-bright, dark-mysterious, dreamy, epic, peaceful, energetic, melancholic, luxurious, wild, futuristic-tech
+
+**技术参数标签 (可多选, 根据需要选择)**:
+- 85mm-lens, wide-angle, macro, telephoto, fisheye, shallow-dof, deep-focus, golden-hour, blue-hour, studio-lighting
+
+**构图参数标签 (可多选, 根据需要选择)**:
+- rule-of-thirds, centered, low-angle, high-angle, close-up, wide-shot, medium-shot, extreme-close-up, dynamic, minimalist
+
+**效果增强标签 (可多选, 根据需要选择)**:
+- highly-detailed, cinematic-quality, professional, masterpiece, volumetric-lighting, color-grading, hdr, film-grain
 
 **Return in JSON format**:
 \`\`\`json
@@ -376,18 +395,30 @@ ${previousAnalysis ? '- Focus on solving issues found in the analysis' : ''}
   "confidence": 85,
   "reasoning": "Optimization approach explanation focusing on analysis-based improvements",
   "suggestedTags": {
-    "artStyle": "Most suitable art style based on analysis",
-    "mood": "Most suitable mood/atmosphere based on analysis", 
-    "technical": ["Suitable technical parameters based on analysis"],
-    "enhancement": ["Suitable enhancement keywords based on analysis"]
+    "artStyle": "精确的艺术风格标签ID (如: photorealistic)",
+    "themeStyle": "精确的主题风格标签ID (如: sci-fi)",
+    "mood": "精确的情绪氛围标签ID (如: warm-bright)", 
+    "technical": ["精确的技术参数标签ID数组 (如: [\"85mm-lens\", \"golden-hour\"])"],
+    "composition": ["精确的构图参数标签ID数组 (如: [\"rule-of-thirds\", \"close-up\"])"],
+    "enhancement": ["精确的效果增强标签ID数组 (如: [\"highly-detailed\", \"volumetric-lighting\"])"]
   }
 }
 \`\`\`
 
-**Important**:
-1. Prioritize solving specific issues found in the analysis
-2. Select the most suitable tags based on analysis suggestions, not generic ones
-3. Clearly explain in improvements how analysis results were addressed
-4. Maintain original creative intent while focusing on quality enhancement
-5. Return valid JSON format`;
+**CRITICAL Requirements**:
+1. **MUST use exact tag IDs** from the predefined system above - NO exceptions
+2. **Single selection rule**: artStyle, themeStyle, mood can only have ONE value each
+3. **Multi-selection rule**: technical, composition, enhancement can have multiple values
+4. **NO custom tags**: Only use the predefined IDs listed above
+5. **Example valid suggestedTags**:
+   {
+     "artStyle": "photorealistic",
+     "themeStyle": "sci-fi", 
+     "mood": "warm-bright",
+     "technical": ["85mm-lens", "golden-hour"],
+     "composition": ["rule-of-thirds", "close-up"],
+     "enhancement": ["highly-detailed", "volumetric-lighting"]
+   }
+6. Prioritize solving specific issues found in the analysis
+7. Return valid JSON format`;
 } 

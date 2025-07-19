@@ -289,8 +289,8 @@ export const PromptFeaturesInline: React.FC<{ result: GenerationResult }> = ({ r
         </span>
       )}
 
-      {/* 🔥 显示重要的技术增强效果（最多2个）*/}
-      {features.technicals.slice(0, 2).map((tech, index) => (
+      {/* 🔥 显示所有技术增强效果 - 移除数量限制 */}
+      {features.technicals.map((tech, index) => (
         <span 
           key={index}
           className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${getColorClasses(tech.color)}`}
@@ -298,13 +298,6 @@ export const PromptFeaturesInline: React.FC<{ result: GenerationResult }> = ({ r
           {tech.icon} {tech.label}
         </span>
       ))}
-
-      {/* 更多指示器 - 只有超过2个增强效果时才显示 */}
-      {features.technicals.length > 2 && (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border bg-gray-100 text-gray-600 border-gray-200">
-          +{features.technicals.length - 2}
-        </span>
-      )}
     </div>
   );
 };
