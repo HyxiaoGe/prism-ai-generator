@@ -890,28 +890,26 @@ export class DatabaseService {
         }
       });
 
-      // 🚀 性能优化4：批量执行更新操作（使用upsert避免多次查询）
-      const promises: Promise<any>[] = [];
+      // 🚀 性能优化4：批量执行更新操作
+      const promises: Promise<void>[] = [];
 
       // 批量插入新标签
       if (toInsert.length > 0) {
         console.log(`📝 批量插入 ${toInsert.length} 个新标签`);
-        promises.push(
-          supabase
-            .from('tag_stats')
-            .insert(toInsert)
-            .then(result => {
-              if (result.error) {
-                console.error('批量插入标签失败:', result.error);
-              } else {
-                console.log(`✅ 成功插入 ${toInsert.length} 个标签`);
-              }
-              return result;
-            })
-        );
+        const insertPromise = supabase
+          .from('tag_stats')
+          .insert(toInsert)
+          .then((result: any) => {
+            if (result.error) {
+              console.error('批量插入标签失败:', result.error);
+            } else {
+              console.log(`✅ 成功插入 ${toInsert.length} 个标签`);
+            }
+          });
+        promises.push(insertPromise);
       }
 
-      // 批量更新现有标签 - 使用RPC调用或分批更新
+      // 批量更新现有标签 - 并行执行多个更新
       if (toUpdate.length > 0) {
         console.log(`🔄 批量更新 ${toUpdate.length} 个现有标签`);
         // Supabase不支持真正的批量更新，所以我们并行执行多个更新
@@ -926,20 +924,19 @@ export class DatabaseService {
             .eq('id', update.id)
         );
 
-        promises.push(
-          Promise.allSettled(updatePromises).then((results: any) => {
-            const successCount = results.filter((r: any) => r.status === 'fulfilled').length;
-            const failCount = results.filter((r: any) => r.status === 'rejected').length;
-            console.log(`✅ 标签更新完成: ${successCount} 成功, ${failCount} 失败`);
-            
-            if (failCount > 0) {
-              const failures = results.filter((r: any) => r.status === 'rejected') as PromiseRejectedResult[];
-              failures.forEach((failure: any, index: number) => {
-                console.error(`标签更新失败 [${toUpdate[index]?.id}]:`, failure.reason);
-              });
-            }
-          })
-        );
+        const updateAllPromise = Promise.allSettled(updatePromises).then((results) => {
+          const successCount = results.filter((r) => r.status === 'fulfilled').length;
+          const failCount = results.filter((r) => r.status === 'rejected').length;
+          console.log(`✅ 标签更新完成: ${successCount} 成功, ${failCount} 失败`);
+          
+          if (failCount > 0) {
+            const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+            failures.forEach((failure, index) => {
+              console.error(`标签更新失败 [${toUpdate[index]?.id}]:`, failure.reason);
+            });
+          }
+        });
+        promises.push(updateAllPromise);
       }
 
       // 🚀 性能优化5：并行执行所有数据库操作
