@@ -896,16 +896,18 @@ export class DatabaseService {
       // 批量插入新标签
       if (toInsert.length > 0) {
         console.log(`📝 批量插入 ${toInsert.length} 个新标签`);
-        const insertPromise = supabase
-          .from('tag_stats')
-          .insert(toInsert)
-          .then((result: any) => {
-            if (result.error) {
-              console.error('批量插入标签失败:', result.error);
-            } else {
-              console.log(`✅ 成功插入 ${toInsert.length} 个标签`);
-            }
-          });
+        const insertPromise = Promise.resolve(
+          supabase
+            .from('tag_stats')
+            .insert(toInsert)
+            .then((result: any) => {
+              if (result.error) {
+                console.error('批量插入标签失败:', result.error);
+              } else {
+                console.log(`✅ 成功插入 ${toInsert.length} 个标签`);
+              }
+            })
+        );
         promises.push(insertPromise);
       }
 
@@ -924,18 +926,20 @@ export class DatabaseService {
             .eq('id', update.id)
         );
 
-        const updateAllPromise = Promise.allSettled(updatePromises).then((results) => {
-          const successCount = results.filter((r) => r.status === 'fulfilled').length;
-          const failCount = results.filter((r) => r.status === 'rejected').length;
-          console.log(`✅ 标签更新完成: ${successCount} 成功, ${failCount} 失败`);
-          
-          if (failCount > 0) {
-            const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
-            failures.forEach((failure, index) => {
-              console.error(`标签更新失败 [${toUpdate[index]?.id}]:`, failure.reason);
-            });
-          }
-        });
+        const updateAllPromise = Promise.resolve(
+          Promise.allSettled(updatePromises).then((results) => {
+            const successCount = results.filter((r) => r.status === 'fulfilled').length;
+            const failCount = results.filter((r) => r.status === 'rejected').length;
+            console.log(`✅ 标签更新完成: ${successCount} 成功, ${failCount} 失败`);
+            
+            if (failCount > 0) {
+              const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+              failures.forEach((failure, index) => {
+                console.error(`标签更新失败 [${toUpdate[index]?.id}]:`, failure.reason);
+              });
+            }
+          })
+        );
         promises.push(updateAllPromise);
       }
 
