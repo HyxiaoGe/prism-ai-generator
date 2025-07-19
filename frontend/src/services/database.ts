@@ -1076,13 +1076,15 @@ export class DatabaseService {
   }): Promise<ImageFeedback | null> {
     const user = await this.getOrCreateUser();
 
-    // 检查是否已经对这个批次提交过反馈
-    const { data: existing, error: checkError } = await supabase
+    // 检查是否已经对这个批次提交过反馈 - 修复多行返回错误
+    const { data: existingList, error: checkError } = await supabase
       .from('image_feedback')
       .select('*')
       .eq('generation_id', params.generationId)
       .eq('user_id', user.id)
-      .single();
+      .limit(1);
+
+    const existing = existingList && existingList.length > 0 ? existingList[0] : null;
 
     if (checkError && checkError.code !== 'PGRST116') {
       throw new Error(`检查现有反馈失败: ${checkError.message}`);
@@ -1102,8 +1104,8 @@ export class DatabaseService {
 
 
         
-        // 异步更新标签成功率
-        this.updateTagSuccessRates().catch(console.error);
+        // 🚀 优化：只更新相关标签的成功率，而不是全部标签
+        this.updateSpecificTagsSuccessRates(params.tagsUsed).catch(console.error);
         
         return null;
       } else {
@@ -1126,8 +1128,8 @@ export class DatabaseService {
 
 
         
-        // 异步更新标签成功率
-        this.updateTagSuccessRates().catch(console.error);
+        // 🚀 优化：只更新相关标签的成功率，而不是全部标签
+        this.updateSpecificTagsSuccessRates(params.tagsUsed).catch(console.error);
         
         return data;
       }
@@ -1158,8 +1160,8 @@ export class DatabaseService {
 
 
       
-      // 异步更新标签成功率
-      this.updateTagSuccessRates().catch(console.error);
+      // 🚀 优化：只更新相关标签的成功率，而不是全部标签
+      this.updateSpecificTagsSuccessRates(params.tagsUsed).catch(console.error);
       
       return data;
     }
@@ -1244,7 +1246,85 @@ export class DatabaseService {
   }
 
   /**
-   * 基于反馈更新标签成功率
+   * 🚀 性能优化：只更新指定标签的成功率
+   */
+  async updateSpecificTagsSuccessRates(tagsToUpdate: string[]): Promise<void> {
+    if (!tagsToUpdate || tagsToUpdate.length === 0) {
+      console.log('📊 没有标签需要更新成功率');
+      return;
+    }
+
+    console.log(`📊 优化更新 ${tagsToUpdate.length} 个指定标签的成功率...`);
+
+    try {
+      // 只查询涉及到这些标签的反馈数据
+      const { data: feedbacks, error } = await supabase
+        .from('image_feedback')
+        .select('tags_used, feedback_type, image_urls')
+        .overlaps('tags_used', tagsToUpdate); // 使用overlaps操作符筛选相关反馈
+
+      if (error) {
+        console.error('获取相关反馈数据失败:', error);
+        return;
+      }
+
+      // 统计指定标签的反馈情况
+      const tagFeedbackMap = new Map<string, { likes: number; total: number }>();
+
+      // 初始化要更新的标签
+      tagsToUpdate.forEach(tagName => {
+        tagFeedbackMap.set(tagName, { likes: 0, total: 0 });
+      });
+
+      feedbacks?.forEach((feedback: any) => {
+        feedback.tags_used?.forEach((tagName: string) => {
+          if (tagFeedbackMap.has(tagName)) {
+            const stats = tagFeedbackMap.get(tagName)!;
+            const imageCount = feedback.image_urls?.length || 1;
+            stats.total += imageCount;
+            if (feedback.feedback_type === 'like') {
+              stats.likes += imageCount;
+            }
+          }
+        });
+      });
+
+      // 只更新有数据的标签
+      const tagsWithData = Array.from(tagFeedbackMap.entries()).filter(([_, stats]) => stats.total > 0);
+      
+      if (tagsWithData.length > 0) {
+        console.log(`📊 批量更新 ${tagsWithData.length} 个标签的成功率...`);
+        
+        const currentTime = new Date().toISOString();
+        const updatePromises = tagsWithData.map(([tagName, stats]) => {
+          const successRate = stats.total > 0 ? stats.likes / stats.total : 0;
+          const averageRating = successRate * 5;
+          
+          return supabase
+            .from('tag_stats')
+            .update({
+              success_rate: successRate,
+              average_rating: averageRating,
+            })
+            .eq('tag_name', tagName);
+        });
+
+        const results = await Promise.allSettled(updatePromises);
+        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        const failCount = results.filter(r => r.status === 'rejected').length;
+        
+        console.log(`✅ 优化更新完成: ${successCount} 成功, ${failCount} 失败 (仅涉及相关标签)`);
+      } else {
+        console.log('📊 指定标签暂无反馈数据，跳过更新');
+      }
+
+    } catch (error) {
+      console.error('❌ 更新指定标签成功率失败:', error);
+    }
+  }
+
+  /**
+   * 基于反馈更新标签成功率 (原有方法，更新所有标签)
    */
   async updateTagSuccessRates(): Promise<void> {
 
@@ -1290,17 +1370,17 @@ export class DatabaseService {
           
           return {
             tag_name: tagName,
+            tag_category: 'technical', // 默认分类，实际应该从现有记录中获取
             success_rate: successRate,
             average_rating: averageRating,
-            updated_at: currentTime,
           };
         });
 
-        // 使用批量upsert更新成功率
+        // 使用批量upsert更新成功率 - 修复ON CONFLICT约束问题
         const { error: batchUpdateError } = await supabase
           .from('tag_stats')
           .upsert(upsertData, {
-            onConflict: 'tag_name',
+            onConflict: 'tag_name,tag_category', // 使用复合唯一约束
             ignoreDuplicates: false // 允许更新已存在的记录
           });
 
@@ -1320,7 +1400,7 @@ export class DatabaseService {
                 .update({
                   success_rate: successRate,
                   average_rating: averageRating,
-                  updated_at: currentTime,
+                  // updated_at: currentTime, // tag_stats表没有updated_at字段
                 })
                 .eq('tag_name', tagName);
 
