@@ -198,7 +198,7 @@ function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, output
         scheduler: "K_EULER",
         num_outputs: numOutputs,
         guidance_scale: 0,
-        negative_prompt: "worst quality, low quality",
+        // negative_prompt 已移除 - 现代AI模型通过优化提示词自动避免不良输出
         num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
         seed: Math.floor(Math.random() * 1000000), // 随机种子
       };

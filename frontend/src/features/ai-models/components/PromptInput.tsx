@@ -107,15 +107,7 @@ const ENHANCEMENT_TAGS = [
   { label: '胶片质感', value: 'film grain, analog photography, vintage film look, organic texture', displayValue: '胶片质感效果' },
 ];
 
-// 负面提示词组（新增）
-const NEGATIVE_PROMPT_TAGS = [
-  { label: '避免模糊', value: 'blurry, out of focus, motion blur, soft focus', displayValue: '避免画面模糊' },
-  { label: '避免低质量', value: 'low quality, pixelated, compressed, artifact, noise', displayValue: '避免低质量画面' },
-  { label: '避免变形', value: 'distorted, deformed, mutated, disfigured, anatomical errors', displayValue: '避免形体变形' },
-  { label: '避免过曝', value: 'overexposed, blown out highlights, washed out, too bright', displayValue: '避免过度曝光' },
-  { label: '避免卡通化', value: 'cartoonish, anime, illustration, drawing, painted', displayValue: '避免卡通化效果' },
-  { label: '避免复制粘贴感', value: 'copy paste, repetitive, tiled, pattern artifacts', displayValue: '避免重复瑕疵' },
-];
+// 负面提示词功能已移除 - 现代AI模型通过优化提示词自动避免不良输出
 
 // 场景预设模板（新增）
 const SCENE_TEMPLATES = [

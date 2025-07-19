@@ -1,7 +1,7 @@
 // 生成请求配置
 export interface GenerationConfig {
   prompt: string;
-  negativePrompt?: string;
+  // negativePrompt 已移除 - 现代AI模型通过优化提示词自动避免不良输出
   aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
   numOutputs: number;
   outputFormat: 'webp' | 'jpg' | 'png';
@@ -23,7 +23,7 @@ export interface GenerationConfig {
     technical?: string[];
     composition?: string[];
     enhancement?: string[];
-    negative?: string[];
+    // negative 已移除 - 现代AI模型不需要负面提示词
     isQualityEnhanced?: boolean;
   };
 }

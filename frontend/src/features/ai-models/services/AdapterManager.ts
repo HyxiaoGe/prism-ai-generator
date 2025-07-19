@@ -50,7 +50,7 @@ export class AdapterManager {
           'text-to-image',
           'aspect-ratio-control',
           'batch-generation',
-          'negative-prompts',
+          // 'negative-prompts' 已移除 - 现代AI模型不需要负面提示词
           'format-selection',
           'step-control'
         ],

@@ -509,16 +509,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 });
               }
               
-              // 负面提示词
-              if (selectedTags.negative) {
-                selectedTags.negative.forEach(neg => {
-                  tagsUsed.push({
-                    name: getTagDisplayName(neg),
-                    category: 'negative' as const,
-                    value: neg
-                  });
-                });
-              }
+              // 负面提示词功能已移除 - 现代AI模型通过优化提示词自动避免不良输出
               
               // 品质增强
               if (selectedTags.isQualityEnhanced) {

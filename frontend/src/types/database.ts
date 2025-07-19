@@ -64,8 +64,8 @@ export type TagCategory =
   | 'mood'             // 情绪氛围组
   | 'technical'        // 技术参数组
   | 'composition'      // 构图参数组
-  | 'enhancement'      // 增强属性组
-  | 'negative';        // 负面提示词组
+  | 'enhancement';     // 增强属性组
+  // negative 分类已移除 - 现代AI模型不需要负面提示词
 
 // 新增：图片反馈表
 export interface ImageFeedback {
