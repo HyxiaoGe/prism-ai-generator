@@ -586,7 +586,6 @@ export class DatabaseService {
           usage_count: 1, // 新记录时为1，已存在记录时会被忽略
           last_used: currentTime,
           average_rating: 0,
-          updated_at: currentTime,
         }, {
           onConflict: 'prompt_text',
           ignoreDuplicates: true // 只插入新的提示词，已存在的保持不变
