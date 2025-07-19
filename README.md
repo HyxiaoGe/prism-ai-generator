@@ -232,6 +232,6 @@ warm lighting, soft sunlight, highly detailed`;
 
 **⭐ 如果这个项目对你有帮助，请给一个星标支持！**
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by HyxiaoGe
 
 </div>
