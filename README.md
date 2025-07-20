@@ -18,16 +18,17 @@
 - **📋 智能模板**：预设多种创作模板，快速启发灵感
 
 ### 🎨 专业级图像生成
-- **⚡ 多模型支持**：Flux Schnell（快速）、Google Imagen（高质量）
-- **🎛️ 丰富配置**：长宽比、输出格式、推理步数等专业参数
-- **📱 现代化界面**：三种视图模式（首页/创作/画廊），流畅的用户体验
-- **🖼️ 批量生成**：支持1-4张图片同时生成
+- **⚡ 精选模型**：Flux Schnell（超快4步生成）、Google Imagen 4 Ultra（顶级质量）
+- **🎛️ 智能配置**：参数自动匹配模型最佳设置，推荐标签指导用户选择
+- **📱 现代化界面**：三种视图模式（首页/创作/画廊），流畅的响应式体验
+- **🖼️ 灵活生成**：根据模型特性自适应（快速模型4张批量，高质量模型精品单张）
 
 ### 🚀 性能与体验
-- **📦 批次管理**：智能的作品组织和展示系统
-- **🖼️ 图片懒加载**：优化加载性能，流畅的瀑布流布局
+- **📦 智能批次管理**：标签分类展示、折叠/展开、批次级操作
+- **🖼️ 懒加载优化**：Intersection Observer、渐进式加载、CORS跨域解决
+- **🌐 翻译功能**：智能提示词翻译、数据库缓存、一键收起/展开
 - **👤 免注册使用**：基于设备指纹的匿名用户系统
-- **📊 用量管理**：每日生成限制和使用统计
+- **📊 反馈系统**：点赞/踩功能、批次级反馈、数据分析统计
 
 ## 🏗️ 技术架构
 
@@ -42,14 +43,15 @@ React 18 + TypeScript + Vite
 
 ### 后端服务
 ```
-Netlify Functions (Serverless)
-├── 🎨 generate-image - AI图像生成
+Netlify Functions (Serverless) - 60秒超时优化
+├── 🎨 generate-image - AI图像生成（智能轮询、超时保护）
 ├── 🧠 optimize-prompt - 提示词优化
 ├── 🔍 analyze-prompt - 提示词分析
-├── 🌐 translate-prompt - 中英翻译
+├── 🌐 translate-prompt - 中英翻译（数据库缓存）
 ├── 📋 generate-template - 模板生成
 ├── 💡 prompt-suggestions - 智能建议
-└── 📁 upload-to-r2 - 文件存储
+├── 📁 upload-to-r2 - 文件存储
+└── 📥 download-image - 图片代理下载（CORS解决）
 ```
 
 ### 数据存储
@@ -89,6 +91,11 @@ cp frontend/.env.example frontend/.env.local
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 REPLICATE_API_TOKEN=your_replicate_token
+
+# Netlify Functions 环境变量
+CLOUDFLARE_R2_ACCESS_KEY=your_r2_access_key
+CLOUDFLARE_R2_SECRET_KEY=your_r2_secret_key  
+CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
 ```
 
 4. **启动开发服务器**
@@ -107,10 +114,11 @@ cd frontend && npm run dev
 项目使用 Supabase 作为数据库，主要表结构：
 
 - `users` - 用户管理（基于设备指纹）
-- `generations` - 生成记录
+- `generations` - 生成记录（增强R2存储支持）
 - `daily_stats` - 每日统计
 - `tag_stats` - 标签使用统计
-- `image_feedback` - 用户反馈
+- `image_feedback` - 用户反馈（批次级反馈）
+- `prompt_translations` - 翻译缓存（避免重复翻译）
 
 详细的数据库Schema可以在 `frontend/src/types/database.ts` 中查看。
 
@@ -147,6 +155,16 @@ photorealistic, professional photography, 8K ultra-detailed,
 warm lighting, soft sunlight, highly detailed`;
 ```
 
+### 🌐 智能翻译系统
+- **数据库缓存** - 相同提示词自动使用缓存，避免重复翻译
+- **一键切换** - 点击翻译按钮查看中文，再次点击收起
+- **专业术语** - 保留关键英文术语，提供中英对照
+
+### 📊 用户体验优化
+- **推荐标签** - 每个模型的最佳参数都有绿色"推荐"标识
+- **智能配置** - 切换模型时自动匹配最佳设置
+- **批次管理** - 支持折叠/展开、批量操作、反馈统计
+
 ### 标签分类系统
 - **艺术风格**：摄影级逼真、电影级画质、油画风格、动漫风格
 - **主题风格**：赛博朋克、科幻场景、奇幻风格、中国风
@@ -182,6 +200,9 @@ warm lighting, soft sunlight, highly detailed`;
    VITE_SUPABASE_URL
    VITE_SUPABASE_ANON_KEY
    REPLICATE_API_TOKEN
+   CLOUDFLARE_R2_ACCESS_KEY
+   CLOUDFLARE_R2_SECRET_KEY
+   CLOUDFLARE_R2_BUCKET_NAME
    ```
 
 3. **构建设置**
@@ -207,13 +228,27 @@ warm lighting, soft sunlight, highly detailed`;
 
 ## 📝 开发规划
 
-- [ ] 🎨 更多AI模型接入（Midjourney、DALL-E 3）
-- [ ] 📱 移动端适配优化
+### ✅ 已完成功能
+- ✅ 智能提示词翻译系统（数据库缓存）
+- ✅ 用户反馈系统（点赞/踩）
+- ✅ 图片下载CORS问题解决
+- ✅ 模型参数智能推荐
+- ✅ 504超时问题修复
+- ✅ 批次级操作优化
+
+### 🚧 开发中
+- [ ] 🎨 更多AI模型接入（DALL-E 3、Stable Diffusion XL）
+- [ ] 📱 移动端体验优化
+- [ ] 🎯 图片尺寸动态调整
+- [ ] 🚀 CDN加速优化
+
+### 🔮 未来规划
 - [ ] 🔐 用户账户系统
 - [ ] 🎪 社区分享功能
 - [ ] 🎯 ControlNet 精确控制
 - [ ] 🖼️ 图生图功能
 - [ ] 🎨 风格迁移工具
+- [ ] 📊 高级数据分析
 
 ## 📄 许可证
 
