@@ -57,24 +57,24 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
     // 获取模型的默认配置
     const defaultConfig = await AIService.getRecommendedConfig(model.id);
     
-    // 检查当前选择的输出格式是否被新模型支持
-    const currentFormat = currentConfig.outputFormat || defaultConfig.outputFormat || 'webp';
+    // 使用模型的默认输出格式，如果不支持则使用第一个支持的格式
     const supportedFormats = model.capabilities.supportedFormats;
-    const newOutputFormat = supportedFormats.includes(currentFormat as any) 
-      ? currentFormat 
-      : (supportedFormats[0] || 'webp'); // 如果不支持，选择第一个支持的格式，如果都没有则使用webp
+    const preferredFormat = defaultConfig.outputFormat;
+    const newOutputFormat = supportedFormats.includes(preferredFormat as any) 
+      ? preferredFormat 
+      : (supportedFormats[0] || 'webp'); // 如果默认格式不支持，选择第一个支持的格式
 
-    // 检查生成数量是否超过模型限制
+    // 使用模型的默认生成数量，但不超过模型限制
     const maxOutputs = model.capabilities?.maxOutputs || 4;
-    const adjustedNumOutputs = Math.min(currentConfig.numOutputs || defaultConfig.numOutputs || 1, maxOutputs);
+    const adjustedNumOutputs = Math.min(defaultConfig.numOutputs || 1, maxOutputs);
 
-    // 更新配置，保持用户已设置的值，只更新模型相关的配置
+    // 更新配置，使用模型的默认配置
     updateConfig({
       model: model.id,
       ...defaultConfig,
-      // 保持用户可能已经设置的配置
-      numInferenceSteps: defaultConfig.numInferenceSteps || currentConfig.numInferenceSteps,
-      aspectRatio: currentConfig.aspectRatio || defaultConfig.aspectRatio,
+      // 使用模型默认配置，确保参数对应正确
+      numInferenceSteps: defaultConfig.numInferenceSteps,
+      aspectRatio: defaultConfig.aspectRatio,
       outputFormat: newOutputFormat,
       numOutputs: adjustedNumOutputs,
     });
