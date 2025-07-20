@@ -461,15 +461,46 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
             </span>
           )}
           
-          {/* 显示所有增强效果，不限制数量 */}
-          {features.enhancements.map((enhancement, index) => (
-            <span 
-              key={index}
-              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"
-            >
-              ✨ {enhancement.label}
-            </span>
-          ))}
+          {/* 显示所有增强效果，按类型分组显示，不限制数量 */}
+          {features.enhancements.map((enhancement, index) => {
+            // 根据图标判断标签类型
+            const isTechnical = ['📷', '📐', '🔍', '🎯', '🌐', '✨', '🏔️', '🌅', '🌆', '💡'].includes(enhancement.icon);
+            const isComposition = ['📐', '🎯', '📈', '📉', '🔍', '🌄', '👤', '👁️', '⚡', '⭕'].includes(enhancement.icon);
+            
+            // 技术参数标签 (镜头、光线等)
+            if (isTechnical && !isComposition) {
+              return (
+                <span 
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700"
+                >
+                  {enhancement.icon} {enhancement.label}
+                </span>
+              );
+            }
+            
+            // 构图参数标签
+            if (isComposition || ['📐', '🎯', '📈', '📉', '🌄', '👤', '👁️', '⚡', '⭕'].includes(enhancement.icon)) {
+              return (
+                <span 
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
+                >
+                  {enhancement.icon} {enhancement.label}
+                </span>
+              );
+            }
+            
+            // 其他增强效果
+            return (
+              <span 
+                key={index}
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"
+              >
+                {enhancement.icon} {enhancement.label}
+              </span>
+            );
+          })}
         </div>
       </div>
     );
