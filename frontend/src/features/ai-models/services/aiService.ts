@@ -54,50 +54,6 @@ export class AIService {
           supportedFormats: ['jpg', 'png'],
         },
       },
-      {
-        id: 'sdxl-lightning-4step',
-        name: 'ByteDance',
-        description: '闪电生成速度，平衡质量与效率，支持多种风格',
-        provider: 'replicate',
-        isEnabled: true,
-        runsNumber: '1B',
-        costPerGeneration: 0.004,
-        tags: ['快速', '平衡'],
-        defaultConfig: {
-          numInferenceSteps: 4,
-          aspectRatio: '1:1',
-          outputFormat: 'webp',
-          numOutputs: 4,
-        },
-        capabilities: {
-          supportsAspectRatio: true,
-          maxSteps: 8,
-          maxOutputs: 4, // ByteDance支持最多4张图片
-          supportedFormats: ['webp', 'jpg', 'png'],
-        },
-      },
-      {
-        id: 'stable-diffusion',
-        name: 'Stable Diffusion',
-        description: '经典模型，兼容性强，支持多种风格和细致调参',
-        provider: 'replicate',
-        isEnabled: true,
-        runsNumber: '110.5M',
-        costPerGeneration: 0.0095,
-        tags: ['经典', '兼容'],
-        defaultConfig: {
-          numInferenceSteps: 25,
-          aspectRatio: '1:1',
-          outputFormat: 'webp',
-          numOutputs: 4,
-        },
-        capabilities: {
-          supportsAspectRatio: true,
-          maxSteps: 50,
-          maxOutputs: 4, // Stable Diffusion支持最多4张图片
-          supportedFormats: ['webp', 'jpg', 'png'],
-        },
-      },
     ];
   }
 
