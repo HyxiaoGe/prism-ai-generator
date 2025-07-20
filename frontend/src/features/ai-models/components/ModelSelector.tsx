@@ -208,27 +208,39 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">📐 图像尺寸</label>
             <div className="grid grid-cols-1 gap-2">
-              {aspectRatioOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => handleConfigUpdate('aspectRatio', option.value)}
-                  className={`text-left p-3 rounded-lg border transition-colors ${
-                    currentConfig.aspectRatio === option.value
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-sm">{option.label}</div>
-                      <div className="text-xs text-gray-500">{option.desc}</div>
+              {aspectRatioOptions.map((option) => {
+                const isSelected = currentConfig.aspectRatio === option.value;
+                const isRecommended = selectedModel?.defaultConfig.aspectRatio === option.value;
+                
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleConfigUpdate('aspectRatio', option.value)}
+                    className={`text-left p-3 rounded-lg border transition-colors ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="font-medium text-sm">{option.label}</div>
+                          {isRecommended && (
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
+                              推荐
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">{option.desc}</div>
+                      </div>
+                      {isSelected && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
                     </div>
-                    {currentConfig.aspectRatio === option.value && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    )}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -239,23 +251,34 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
               {(() => {
                 // 根据模型能力动态生成可选数量
                 const maxOutputs = selectedModel.capabilities?.maxOutputs || 4;
+                const recommendedNum = selectedModel?.defaultConfig.numOutputs;
                 const availableNumbers = [];
                 for (let i = 1; i <= maxOutputs; i++) {
                   availableNumbers.push(i);
                 }
-                return availableNumbers.map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => handleConfigUpdate('numOutputs', num)}
-                    className={`p-2 text-sm rounded-lg border transition-colors ${
-                      currentConfig.numOutputs === num
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {num}张
-                  </button>
-                ));
+                return availableNumbers.map((num) => {
+                  const isSelected = currentConfig.numOutputs === num;
+                  const isRecommended = recommendedNum === num;
+                  
+                  return (
+                    <button
+                      key={num}
+                      onClick={() => handleConfigUpdate('numOutputs', num)}
+                      className={`relative p-2 text-sm rounded-lg border transition-colors ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <span>{num}张</span>
+                        {isRecommended && (
+                          <span className="text-xs text-green-600 font-medium">推荐</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                });
               })()}
             </div>
             {selectedModel.capabilities?.maxOutputs === 1 && (
@@ -268,7 +291,14 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
           {/* 推理步数 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">🔄 推理步数</label>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">🔄 推理步数</label>
+                {currentConfig.numInferenceSteps === selectedModel?.defaultConfig.numInferenceSteps && (
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
+                    推荐
+                  </span>
+                )}
+              </div>
               <span className="text-sm text-gray-500">{currentConfig.numInferenceSteps}</span>
             </div>
             <input
@@ -289,20 +319,34 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">🖼️ 输出格式</label>
             <div className="grid grid-cols-3 gap-2">
-              {formatOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => handleConfigUpdate('outputFormat', option.value)}
-                  className={`p-2 text-sm rounded-lg border transition-colors text-center ${
-                    currentConfig.outputFormat === option.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">{option.label}</div>
-                  <div className="text-xs text-gray-500">{option.desc}</div>
-                </button>
-              ))}
+              {formatOptions.map((option) => {
+                const isSelected = currentConfig.outputFormat === option.value;
+                const isRecommended = selectedModel?.defaultConfig.outputFormat === option.value;
+                
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleConfigUpdate('outputFormat', option.value)}
+                    className={`relative p-2 text-sm rounded-lg border transition-colors text-center ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center space-y-1">
+                      <div className="flex items-center space-x-1">
+                        <div className="font-medium">{option.label}</div>
+                        {isRecommended && (
+                          <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded font-medium">
+                            推荐
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">{option.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
