@@ -180,7 +180,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   // 新增的多选组
   const [selectedTechnical, setSelectedTechnical] = useState<string[]>([]); // 技术参数
   const [selectedComposition, setSelectedComposition] = useState<string[]>([]); // 构图参数
-  const [selectedNegative, setSelectedNegative] = useState<string[]>([]); // 负面提示词
+  // selectedNegative 已移除 - 负面提示词功能已删除
   
   const [isQualityEnhanced, setIsQualityEnhanced] = useState(false); // 品质增强独立存储
   const [showFullPrompt, setShowFullPrompt] = useState(false); // 是否显示完整提示词预览
@@ -212,7 +212,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     setSelectedEnhancements([]);
     setSelectedTechnical([]);
     setSelectedComposition([]);
-    setSelectedNegative([]);
+    // setSelectedNegative([]);
     setIsQualityEnhanced(false);
     setSelectedTemplate('');
   }, [initialPrompt]);
@@ -378,11 +378,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     return parts.filter(part => part).join(', ');
   };
 
-  // 生成负面提示词
-  const getNegativePrompt = (): string => {
-    if (selectedNegative.length === 0) return '';
-    return selectedNegative.join(', ');
-  };
+  // getNegativePrompt 已移除 - 负面提示词功能已删除
 
   // 处理提示词输入
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -444,14 +440,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     );
   };
 
-  // 切换负面提示词（多选）
-  const toggleNegative = (tagValue: string) => {
-    setSelectedNegative(prev => 
-      prev.includes(tagValue) 
-        ? prev.filter(tag => tag !== tagValue)
-        : [...prev, tagValue]
-    );
-  };
+  // toggleNegative 已移除 - 负面提示词功能已删除
 
   // 添加主题建议
   const addSubjectSuggestion = (subject: string) => {
@@ -499,7 +488,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     setSelectedEnhancements([]);
     setSelectedTechnical([]);
     setSelectedComposition([]);
-    setSelectedNegative([]);
+    // setSelectedNegative([]);
     setIsQualityEnhanced(false);
     setSelectedTemplate('');
     setAiSuggestedTags({});
@@ -829,7 +818,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
       technical: selectedTechnical.length > 0 ? selectedTechnical : undefined,
       composition: selectedComposition.length > 0 ? selectedComposition : undefined,
       enhancement: selectedEnhancements.length > 0 ? selectedEnhancements : undefined,
-      negative: selectedNegative.length > 0 ? selectedNegative : undefined,
+      // negative: 已移除 - 负面提示词功能已删除
       isQualityEnhanced: isQualityEnhanced || undefined,
     };
 
@@ -841,14 +830,14 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     console.log('📷 技术参数 (selectedTechnical):', selectedTechnical);
     console.log('🖼️ 构图参数 (selectedComposition):', selectedComposition);
     console.log('✨ 增强效果 (selectedEnhancements):', selectedEnhancements);
-    console.log('🚫 负面提示词 (selectedNegative):', selectedNegative);
+    // console.log('负面提示词', 已移除);
     console.log('💎 品质增强 (isQualityEnhanced):', isQualityEnhanced);
     console.log('🎯 最终selectedTags对象:', selectedTags);
 
     const config: GenerationConfig = {
       ...currentConfig,
       prompt: effectivePrompt.trim(), // 🔥 使用有效提示词（优化提示词或组合提示词）
-      negativePrompt: getNegativePrompt(),
+      // negativePrompt: 已移除 - 负面提示词功能已删除
       selectedTags, // 新增：传递标签信息
     } as GenerationConfig;
 
@@ -884,7 +873,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   const fullPrompt = getFullPrompt();
   const hasEnhancements = selectedArtStyle || selectedThemeStyle || selectedMood || 
                          selectedEnhancements.length > 0 || selectedTechnical.length > 0 ||
-                         selectedComposition.length > 0 || selectedNegative.length > 0 || 
+                         selectedComposition.length > 0 || // negative 已移除 || 
                          isQualityEnhanced;
 
   return (
@@ -1076,12 +1065,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
                 <span className="text-gray-600">高品质细节增强</span>
               </div>
             )}
-            {selectedNegative.length > 0 && (
-              <div className="text-xs">
-                <span className="text-red-600 font-medium">🚫 负面提示词：</span>
-                <span className="text-gray-600">{selectedNegative.map(val => getDisplayValue(val, [NEGATIVE_PROMPT_TAGS])).join('，')}</span>
-              </div>
-            )}
+            {/* 负面提示词已移除 - 现代AI模型不需要负面提示词 */}
           </div>
         </div>
       )}
@@ -1280,47 +1264,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         </div>
       </div>
 
-      {/* 高级选项组 */}
-      {showAdvanced && (
-        <div className="space-y-6 p-4 bg-red-50/50 rounded-xl border border-red-200">
-          <div className="text-sm font-medium text-red-800 mb-4">🚫 负面提示词（高级）</div>
-          
-          {/* 负面提示词组（可多选） */}
-          <div className={compact ? "space-y-2" : "space-y-3"}>
-            <div className="flex items-center justify-between">
-              <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🚫 负面提示词 <span className="text-xs text-gray-500">(避免的元素)</span></h4>
-              {selectedNegative.length > 0 && (
-                <span className="text-xs text-red-600">已选择 {selectedNegative.length} 个</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {NEGATIVE_PROMPT_TAGS.map((tag, index) => (
-                <button
-                  key={index}
-                  onClick={() => toggleNegative(tag.value)}
-                  className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                    selectedNegative.includes(tag.value)
-                      ? 'bg-red-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 负面提示词预览 */}
-          {selectedNegative.length > 0 && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="text-sm text-red-700 font-medium mb-1">负面提示词：</div>
-              <div className="text-sm text-gray-700 bg-white p-2 rounded border">
-                {getNegativePrompt()}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* 高级选项组已移除 - 负面提示词功能已删除，现代AI模型不需要负面提示词 */}
 
       {/* AI智能助手 */}
       {showAIAssistant && (
