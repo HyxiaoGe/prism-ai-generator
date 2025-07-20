@@ -7,6 +7,9 @@ const LLM_MODELS = {
  * 翻译英文提示词为中文
  */
 exports.handler = async (event, context) => {
+  // 🔧 确保函数不会提前结束
+  context.callbackWaitsForEmptyEventLoop = false;
+
   // 设置CORS头
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -180,10 +183,17 @@ function parseTranslationResult(llmResponse, originalPrompt) {
  * 轮询预测结果
  */
 async function pollPrediction(predictionId, apiToken) {
-  const maxAttempts = 30;
+  const maxAttempts = 25; // 减少尝试次数，适配60秒超时
   const delay = 2000;
+  const startTime = Date.now();
+  const maxWaitTime = 55000; // 55秒超时保护
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // 检查超时
+    if (Date.now() - startTime > maxWaitTime) {
+      throw new Error('翻译超时，请重试');
+    }
+
     const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
       headers: {
         'Authorization': `Token ${apiToken}`,

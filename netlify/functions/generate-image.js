@@ -1,4 +1,7 @@
 exports.handler = async (event, context) => {
+  // 🔧 确保函数不会提前结束
+  context.callbackWaitsForEmptyEventLoop = false;
+
   // 处理CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -221,15 +224,17 @@ function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, output
 }
 
 async function pollPrediction(predictionId, apiToken) {
-  const maxAttempts = 18; // 最多等待54秒（适应60秒超时）
-  const pollInterval = 3000; // 3秒轮询一次，更频繁检查
+  const maxAttempts = 20; // 最多等待60秒
+  const pollInterval = 2500; // 2.5秒轮询一次，平衡效率和响应速度
   const startTime = Date.now();
-  const maxWaitTime = 55000; // 55秒超时保护
+  const maxWaitTime = 58000; // 58秒超时保护，留2秒缓冲
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     // 检查是否超过总时间限制
-    if (Date.now() - startTime > maxWaitTime) {
-      throw new Error('Function即将超时，请稍后重试');
+    const elapsed = Date.now() - startTime;
+    if (elapsed > maxWaitTime) {
+      console.error(`❌ 函数执行超时: ${Math.round(elapsed/1000)}s`);
+      throw new Error(`生成超时(${Math.round(elapsed/1000)}s)，图像生成需要时间较长，请稍后重试`);
     }
 
     try {
@@ -262,7 +267,9 @@ async function pollPrediction(predictionId, apiToken) {
 
       // 如果还在处理中，等待后重试
       if (prediction.status === 'starting' || prediction.status === 'processing') {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        // 🚀 动态调整轮询间隔 - 前期更频繁检查
+        const dynamicInterval = attempt <= 5 ? 1500 : pollInterval;
+        await new Promise(resolve => setTimeout(resolve, dynamicInterval));
         continue;
       }
 
@@ -270,10 +277,12 @@ async function pollPrediction(predictionId, apiToken) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
 
     } catch (error) {
-      if (attempt === maxAttempts || Date.now() - startTime > maxWaitTime) {
+      const elapsed = Date.now() - startTime;
+      if (attempt === maxAttempts || elapsed > maxWaitTime) {
+        console.error(`❌ 轮询最终失败: ${error.message}, 总耗时: ${Math.round(elapsed/1000)}s`);
         throw error;
       }
-      console.log(`⚠️ 轮询出错，重试中... ${error.message}`);
+      console.log(`⚠️ 轮询出错，重试中... ${error.message} (尝试 ${attempt}/${maxAttempts})`);
       await new Promise(resolve => setTimeout(resolve, 2000)); // 错误时等待短一些
     }
   }
