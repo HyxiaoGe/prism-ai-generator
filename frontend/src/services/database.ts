@@ -1129,6 +1129,10 @@ export class DatabaseService {
           .single();
 
         if (error) {
+          if (error.code === 'PGRST116') {
+            console.warn('反馈记录不存在，可能已被删除');
+            return null;
+          }
           throw new Error(`更新批次反馈失败: ${error.message}`);
         }
 
@@ -1161,6 +1165,10 @@ export class DatabaseService {
         .single();
 
       if (error) {
+        if (error.code === 'PGRST116') {
+          console.warn('插入反馈记录失败，数据不一致');
+          return null;
+        }
         throw new Error(`提交批次反馈失败: ${error.message}`);
       }
 

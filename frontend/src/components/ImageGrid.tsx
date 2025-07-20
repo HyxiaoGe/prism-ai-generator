@@ -427,80 +427,97 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
     }
   };
 
-  // 渲染批次标题的简化版本
+  // 渲染批次标题 - 直接使用数据库中的 tags_used 数据
   const renderBatchTitle = (batch: any) => {
-    const features = parsePromptFeatures(batch.prompt, batch.config);
+    // 🔥 修复：直接使用数据库中保存的 tags_used 数据
+    const tagsUsed = batch.results?.[0]?.tags_used || batch.tags_used || [];
+    
+    // 按分类分组标签
+    const tagsByCategory = tagsUsed.reduce((acc: any, tag: any) => {
+      if (!acc[tag.category]) {
+        acc[tag.category] = [];
+      }
+      acc[tag.category].push(tag);
+      return acc;
+    }, {});
+    
+    // 获取基础提示词（去除技术标签后的描述）
+    const getBasePrompt = (prompt: string) => {
+      // 简单的清理，去除明显的技术术语
+      return prompt
+        .replace(/\b(photorealistic|highly detailed|8K|4K|professional|masterpiece|best quality)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
     
     return (
       <div className="space-y-2">
         {/* 基础描述作为标题 */}
         <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-          {features.basePrompt || batch.prompt}
+          {getBasePrompt(batch.prompt)}
         </h3>
         
-        {/* 关键标签 - 显示全部，不截断 */}
+        {/* 显示所有标签，按分类组织，不限制数量 */}
         <div className="flex flex-wrap gap-1">
-          {/* 艺术风格 */}
-          {features.artStyle && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-              🎨 {features.artStyle.label}
+          {/* 艺术风格标签 */}
+          {tagsByCategory.art_style?.map((tag: any, index: number) => (
+            <span 
+              key={`art-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"
+            >
+              🎨 {tag.name}
             </span>
-          )}
+          ))}
           
-          {/* 主题风格 */}
-          {features.themeStyle && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-              🏷️ {features.themeStyle.label}
+          {/* 主题风格标签 */}
+          {tagsByCategory.theme_style?.map((tag: any, index: number) => (
+            <span 
+              key={`theme-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"
+            >
+              🏷️ {tag.name}
             </span>
-          )}
+          ))}
           
-          {/* 情绪氛围 */}
-          {features.mood && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-              😊 {features.mood.label}
+          {/* 情绪氛围标签 */}
+          {tagsByCategory.mood?.map((tag: any, index: number) => (
+            <span 
+              key={`mood-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700"
+            >
+              😊 {tag.name}
             </span>
-          )}
+          ))}
           
-          {/* 显示所有增强效果，按类型分组显示，不限制数量 */}
-          {features.enhancements.map((enhancement, index) => {
-            // 根据图标判断标签类型
-            const isTechnical = ['📷', '📐', '🔍', '🎯', '🌐', '✨', '🏔️', '🌅', '🌆', '💡'].includes(enhancement.icon);
-            const isComposition = ['📐', '🎯', '📈', '📉', '🔍', '🌄', '👤', '👁️', '⚡', '⭕'].includes(enhancement.icon);
-            
-            // 技术参数标签 (镜头、光线等)
-            if (isTechnical && !isComposition) {
-              return (
-                <span 
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700"
-                >
-                  {enhancement.icon} {enhancement.label}
-                </span>
-              );
-            }
-            
-            // 构图参数标签
-            if (isComposition || ['📐', '🎯', '📈', '📉', '🌄', '👤', '👁️', '⚡', '⭕'].includes(enhancement.icon)) {
-              return (
-                <span 
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
-                >
-                  {enhancement.icon} {enhancement.label}
-                </span>
-              );
-            }
-            
-            // 其他增强效果
-            return (
-              <span 
-                key={index}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"
-              >
-                {enhancement.icon} {enhancement.label}
-              </span>
-            );
-          })}
+          {/* 技术参数标签 */}
+          {tagsByCategory.technical?.map((tag: any, index: number) => (
+            <span 
+              key={`tech-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700"
+            >
+              📷 {tag.name}
+            </span>
+          ))}
+          
+          {/* 构图参数标签 */}
+          {tagsByCategory.composition?.map((tag: any, index: number) => (
+            <span 
+              key={`comp-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
+            >
+              🖼️ {tag.name}
+            </span>
+          ))}
+          
+          {/* 效果增强标签 */}
+          {tagsByCategory.enhancement?.map((tag: any, index: number) => (
+            <span 
+              key={`enh-${index}`}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"
+            >
+              ✨ {tag.name}
+            </span>
+          ))}
         </div>
       </div>
     );

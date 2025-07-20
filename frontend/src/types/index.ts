@@ -55,6 +55,8 @@ export interface GenerationResult {
   // 🔥 新增：R2存储相关字段
   originalImageUrl?: string; // 保留原始URL作为备用
   r2Info?: R2Info; // R2存储的详细信息
+  // 🔥 新增：标签数据
+  tags_used?: Array<{name: string, category: string, value: string}>;
 }
 
 // 生成状态

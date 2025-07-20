@@ -21,6 +21,8 @@ interface GenerationBatch {
   model: string;
   // 新增：真实的数据库generation_id（UUID格式）
   realGenerationId?: string;
+  // 🔥 新增：标签数据
+  tags_used?: Array<{name: string, category: string, value: string}>;
 }
 
 interface AIGenerationState {
@@ -343,7 +345,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             }
             
             // 将选择的标签转换为数据库所需的格式
-            const tagsUsed = [];
+            const tagsUsed: Array<{name: string, category: TagCategory, value: string}> = [];
             const selectedTags = state.currentConfig.selectedTags;
             
 
@@ -545,9 +547,13 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                   batch.id === batchId ? { 
                     ...batch, 
                     realGenerationId: savedGeneration.id,
+                    // 🔥 修复：添加标签数据到批次
+                    tags_used: tagsUsed,
                     results: batch.results.map(result => ({
                       ...result,
-                      realGenerationId: savedGeneration.id
+                      realGenerationId: savedGeneration.id,
+                      // 🔥 修复：添加标签数据到结果
+                      tags_used: tagsUsed
                     }))
                   } : batch
                 ),
@@ -555,7 +561,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 generationHistory: state.generationHistory.map(historyItem => 
                   results.some(result => result.id === historyItem.id) ? {
                     ...historyItem,
-                    realGenerationId: savedGeneration.id
+                    realGenerationId: savedGeneration.id,
+                    // 🔥 修复：添加标签数据到历史记录
+                    tags_used: tagsUsed
                   } : historyItem
                 )
               }), false, 'updateRealGenerationId');
@@ -697,7 +705,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 // 初始化反馈状态为未设置
                 userFeedback: undefined,
                 // 保存真实的数据库generation_id
-                realGenerationId: record.id
+                realGenerationId: record.id,
+                // 🔥 修复：传递标签数据
+                tags_used: record.tags_used || []
               };
               
               batchResults.push(result);
@@ -718,7 +728,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 createdAt: localDate,
                 model: record.model_name,
                 // 保存真实的数据库generation_id
-                realGenerationId: record.id
+                realGenerationId: record.id,
+                // 🔥 修复：传递标签数据
+                tags_used: record.tags_used || []
               };
               batchesMap.set(batchKey, batch);
             } else {
@@ -1003,7 +1015,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                   guidance: 7.5,
                 },
                 userFeedback: undefined,
-                realGenerationId: record.id
+                realGenerationId: record.id,
+                // 🔥 修复：传递标签数据
+                tags_used: record.tags_used || []
               };
               
               batchResults.push(result);
@@ -1022,7 +1036,9 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                 results: batchResults,
                 createdAt: localDate,
                 model: record.model_name,
-                realGenerationId: record.id
+                realGenerationId: record.id,
+                // 🔥 修复：传递标签数据
+                tags_used: record.tags_used || []
               };
               batchesMap.set(batchKey, batch);
             } else {

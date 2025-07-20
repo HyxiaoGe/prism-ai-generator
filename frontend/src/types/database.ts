@@ -24,6 +24,8 @@ export interface Generation {
   original_image_urls?: string[]; // 原始临时URL（备用）
   r2_keys?: string[];             // R2存储的key数组
   r2_data?: any;                  // R2存储的元数据（JSON格式）
+  // 🔥 新增：标签数据
+  tags_used?: Array<{name: string, category: TagCategory, value: string}>;
 }
 
 export interface PromptStats {
