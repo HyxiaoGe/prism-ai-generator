@@ -330,19 +330,81 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   };
 
   const handleDownload = async (imageUrl: string, filename: string) => {
+    // 显示开始下载提示
+    const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+      const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-orange-500';
+      const notification = document.createElement('div');
+      notification.textContent = message;
+      notification.className = `fixed top-4 right-4 ${bgColor} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 300);
+      }, type === 'error' ? 4000 : 2000);
+    };
+
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      // 🔧 方案1: 尝试直接下载
+      console.log('尝试直接下载:', imageUrl);
+      
       const a = document.createElement('a');
-      a.href = url;
+      a.href = imageUrl;
+      a.download = filename;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      showNotification('📥 图片下载已开始', 'success');
+      
+      // 等待一小段时间，检查下载是否成功启动
+      setTimeout(async () => {
+        try {
+          // 🔧 方案2: 如果直接下载可能有问题，提供代理下载选项
+          const response = await fetch(imageUrl, { method: 'HEAD' });
+          if (!response.ok) {
+            console.log('直接访问失败，尝试代理下载');
+            await downloadViaProxy(imageUrl, filename, showNotification);
+          }
+        } catch (error) {
+          console.log('检测到可能的CORS问题，提供代理下载');
+          await downloadViaProxy(imageUrl, filename, showNotification);
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('直接下载失败:', error);
+      await downloadViaProxy(imageUrl, filename, showNotification);
+    }
+  };
+
+  // 🔧 代理下载函数
+  const downloadViaProxy = async (imageUrl: string, filename: string, showNotification: Function) => {
+    try {
+      showNotification('🔄 使用代理服务下载中...', 'warning');
+      
+      const proxyUrl = `/.netlify/functions/download-image?imageUrl=${encodeURIComponent(imageUrl)}&filename=${encodeURIComponent(filename)}`;
+      
+      const a = document.createElement('a');
+      a.href = proxyUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
-      console.error('Download failed:', error);
+      
+      showNotification('✅ 代理下载已开始', 'success');
+      
+    } catch (proxyError) {
+      console.error('代理下载也失败:', proxyError);
+      
+      // 最后的降级方案：新标签页打开
+      showNotification('❌ 下载失败，已在新标签页打开图片，请右键保存', 'error');
+      window.open(imageUrl, '_blank');
     }
   };
 
