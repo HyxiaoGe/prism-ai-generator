@@ -155,7 +155,11 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
       fromCache: boolean;
     } | null;
     error: string | null;
+    isVisible: boolean; // 新增：翻译结果是否显示
   }>>({});
+  
+  // 提示词展开状态
+  const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
   const gridRef = useRef<HTMLDivElement>(null);
 
   // 计算瀑布流列数
@@ -434,10 +438,30 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [deleteConfirm.isOpen]);
 
+  // 提示词展开/收起功能
+  const togglePromptExpansion = (batchId: string) => {
+    setExpandedPrompts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(batchId)) {
+        newSet.delete(batchId);
+      } else {
+        newSet.add(batchId);
+      }
+      return newSet;
+    });
+  };
+
   // 翻译提示词功能
   const handleTranslatePrompt = async (batchId: string, prompt: string) => {
-    // 检查是否已有翻译结果
+    // 如果已有翻译结果，切换显示状态
     if (translations[batchId]?.result) {
+      setTranslations(prev => ({
+        ...prev,
+        [batchId]: {
+          ...prev[batchId],
+          isVisible: !prev[batchId].isVisible
+        }
+      }));
       return;
     }
 
@@ -447,7 +471,8 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
       [batchId]: {
         isLoading: true,
         result: null,
-        error: null
+        error: null,
+        isVisible: true
       }
     }));
 
@@ -461,7 +486,8 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
         [batchId]: {
           isLoading: false,
           result: result,
-          error: null
+          error: null,
+          isVisible: true
         }
       }));
 
@@ -489,7 +515,8 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
         [batchId]: {
           isLoading: false,
           result: null,
-          error: error instanceof Error ? error.message : '翻译失败'
+          error: error instanceof Error ? error.message : '翻译失败',
+          isVisible: false
         }
       }));
 
@@ -626,12 +653,33 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
         .trim();
     };
     
+    const isExpanded = expandedPrompts.has(batch.id);
+    const basePrompt = getBasePrompt(batch.prompt);
+    const shouldShowExpander = basePrompt.length > 120; // 如果提示词超过120字符则显示展开按钮
+    
     return (
       <div className="space-y-2">
         {/* 基础描述作为标题 */}
-        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-          {getBasePrompt(batch.prompt)}
-        </h3>
+        <div className="flex items-start space-x-2">
+          <h3 className={`text-lg font-semibold text-gray-900 flex-1 ${
+            isExpanded ? '' : 'line-clamp-2'
+          }`}>
+            {basePrompt}
+          </h3>
+          {shouldShowExpander && (
+            <button
+              onClick={() => togglePromptExpansion(batch.id)}
+              className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              title={isExpanded ? '收起提示词' : '展开完整提示词'}
+            >
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          )}
+        </div>
         
         {/* 显示所有标签，按分类组织，不限制数量 */}
         <div className="flex flex-wrap gap-1">
@@ -800,7 +848,9 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                       translations[batch.id]?.isLoading
                         ? '🌐 翻译中...'
                         : translations[batch.id]?.result
-                        ? '✅ 已翻译，点击查看详情'
+                        ? translations[batch.id]?.isVisible
+                          ? '📚 收起翻译结果'
+                          : '📖 展开翻译结果'
                         : '🌐 翻译提示词为中文'
                     }
                   >
@@ -828,7 +878,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
             {!isCollapsed && (
               <div className="p-6 relative">
                 {/* 翻译结果显示 */}
-                {translations[batch.id]?.result && (
+                {translations[batch.id]?.result && translations[batch.id]?.isVisible && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start space-x-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
