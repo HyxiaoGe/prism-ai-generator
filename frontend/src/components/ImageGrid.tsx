@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown, X } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { parsePromptFeatures } from '../features/ai-models/utils/promptParser';
 import { DatabaseService } from '../services/database';
@@ -133,6 +133,16 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set());
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
+  // 删除确认对话框状态
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    batchId: string;
+    batchInfo: { prompt: string; imageCount: number } | null;
+  }>({
+    isOpen: false,
+    batchId: '',
+    batchInfo: null
+  });
   const gridRef = useRef<HTMLDivElement>(null);
 
   // 计算瀑布流列数
@@ -351,23 +361,34 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   const handleDeleteBatch = (batchId: string) => {
     // 获取批次信息用于确认提示
     const batch = generationBatches.find(b => b.id === batchId);
-    const imageCount = batch?.results.length || 0;
-    const promptPreview = batch?.prompt.substring(0, 30) + ((batch?.prompt.length || 0) > 30 ? '...' : '');
+    if (!batch) return;
     
-    const confirmMessage = `确定要删除这个生成批次吗？
+    const imageCount = batch.results.length || 0;
+    const promptPreview = batch.prompt.substring(0, 50) + ((batch.prompt.length || 0) > 50 ? '...' : '');
+    
+    // 显示自定义删除确认对话框
+    setDeleteConfirm({
+      isOpen: true,
+      batchId: batchId,
+      batchInfo: {
+        prompt: promptPreview,
+        imageCount: imageCount
+      }
+    });
+  };
 
-📝 提示词：${promptPreview}
-🖼️ 包含图片：${imageCount} 张
-⚠️ 删除后无法恢复
-
-点击"确定"继续删除，点击"取消"保留批次。`;
-
-    if (confirm(confirmMessage)) {
+  // 确认删除
+  const confirmDelete = () => {
+    const { batchId, batchInfo } = deleteConfirm;
+    if (batchId && batchInfo) {
       removeBatch(batchId);
+      
+      // 关闭对话框
+      setDeleteConfirm({ isOpen: false, batchId: '', batchInfo: null });
       
       // 显示删除成功提示
       const notification = document.createElement('div');
-      notification.textContent = `🗑️ 已删除批次（${imageCount}张图片）`;
+      notification.textContent = `🗑️ 已删除批次（${batchInfo.imageCount}张图片）`;
       notification.className = 'fixed top-4 right-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
       document.body.appendChild(notification);
       
@@ -379,6 +400,26 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
       }, 2000);
     }
   };
+
+  // 取消删除
+  const cancelDelete = () => {
+    setDeleteConfirm({ isOpen: false, batchId: '', batchInfo: null });
+  };
+
+  // 键盘支持和点击背景关闭
+  useEffect(() => {
+    if (!deleteConfirm.isOpen) return;
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelDelete();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [deleteConfirm.isOpen]);
 
   // 处理批次重新生成
   const handleBatchRegenerate = (batch: any) => {
@@ -892,6 +933,89 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
             {/* 图片信息 */}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm backdrop-blur-sm">
               {getCurrentImageIndex() + 1} / {getCurrentBatchImages().length}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 自定义删除确认对话框 */}
+      {deleteConfirm.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              cancelDelete();
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* 头部 */}
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">确认删除</h3>
+                </div>
+                <button
+                  onClick={cancelDelete}
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 内容 */}
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
+                你确定要删除这个生成批次吗？删除后将无法恢复。
+              </p>
+              
+              {deleteConfirm.batchInfo && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-blue-600 text-xs font-medium">📝</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-600 mb-1">提示词</p>
+                      <p className="text-sm text-gray-900 break-words">
+                        {deleteConfirm.batchInfo.prompt}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-600 text-xs font-medium">🖼️</span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">包含图片</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {deleteConfirm.batchInfo.imageCount} 张
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="p-6 border-t border-gray-100 flex space-x-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 px-4 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2.5 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+              >
+                确认删除
+              </button>
             </div>
           </div>
         </div>
