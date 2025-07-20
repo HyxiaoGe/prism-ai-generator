@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { prompt, model = 'flux-schnell', aspectRatio = '1:1', numInferenceSteps = 4, outputFormat = 'webp', numOutputs = 4 } = JSON.parse(event.body);
+    const { prompt, model = 'flux-schnell', aspectRatio, numInferenceSteps, outputFormat, numOutputs } = JSON.parse(event.body);
     
     if (!prompt) {
       return {
@@ -84,33 +84,21 @@ const SUPPORTED_MODELS = {
     version: 'black-forest-labs/flux-schnell',
     defaultSteps: 4,
     maxSteps: 8,
+    defaultAspectRatio: '1:1',
+    defaultOutputFormat: 'webp',
+    defaultNumOutputs: 4,
     supportsAspectRatio: true,
     supportedFormats: ['webp', 'jpg', 'png'],
-    numOutputs: 4,
   },
   'imagen-4-ultra': {
     version: 'google/imagen-4-ultra',
     defaultSteps: 28,
     maxSteps: 50,
+    defaultAspectRatio: '16:9',
+    defaultOutputFormat: 'jpg',
+    defaultNumOutputs: 1,
     supportsAspectRatio: true,
     supportedFormats: ['jpg', 'png'],
-    numOutputs: 1,
-  },
-  'sdxl-lightning-4step': {
-    version: 'bytedance/sdxl-lightning-4step:6f7a773af6fc3e8de9d5a3c00be77c17308914bf67772726aff83496ba1e3bbe',
-    defaultSteps: 4,
-    maxSteps: 8,
-    supportsAspectRatio: false, // SDXL Lightning使用固定尺寸
-    supportedFormats: ['webp', 'jpg', 'png'],
-    numOutputs: 4,
-  },
-  'stable-diffusion': {
-    version: 'stability-ai/stable-diffusion:ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4',
-    defaultSteps: 20,
-    maxSteps: 50,
-    supportsAspectRatio: false,
-    supportedFormats: ['webp', 'jpg', 'png'],
-    numOutputs: 4,
   }
 };
 
@@ -122,18 +110,34 @@ async function generateWithReplicate(config, apiToken) {
     throw new Error(`不支持的模型: ${model}`);
   }
 
+  // 🔧 使用模型特定的默认值
+  const finalConfig = {
+    prompt,
+    model,
+    aspectRatio: aspectRatio || modelConfig.defaultAspectRatio,
+    numInferenceSteps: numInferenceSteps || modelConfig.defaultSteps,
+    outputFormat: outputFormat || modelConfig.defaultOutputFormat,
+    numOutputs: numOutputs || modelConfig.defaultNumOutputs
+  };
+
   try {
     // 第一步：创建预测
-    console.log('📤 创建Replicate预测...', { model: modelConfig.version, aspectRatio, steps: numInferenceSteps });
+    console.log('📤 创建Replicate预测...', { 
+      model: modelConfig.version, 
+      aspectRatio: finalConfig.aspectRatio, 
+      steps: finalConfig.numInferenceSteps,
+      outputs: finalConfig.numOutputs,
+      format: finalConfig.outputFormat
+    });
     
     // 根据不同模型构建输入参数
     const input = buildModelInput({
-      prompt,
-      model,
-      aspectRatio,
-      numInferenceSteps,
-      outputFormat,
-      numOutputs,
+      prompt: finalConfig.prompt,
+      model: finalConfig.model,
+      aspectRatio: finalConfig.aspectRatio,
+      numInferenceSteps: finalConfig.numInferenceSteps,
+      outputFormat: finalConfig.outputFormat,
+      numOutputs: finalConfig.numOutputs,
       modelConfig
     });
 
@@ -165,7 +169,7 @@ async function generateWithReplicate(config, apiToken) {
     return {
       status: 'succeeded',
       output: result.output || [],
-      input: { prompt, model, aspectRatio, numInferenceSteps, outputFormat, numOutputs }
+      input: finalConfig
     };
 
   } catch (error) {
@@ -191,31 +195,6 @@ function buildModelInput({ prompt, model, aspectRatio, numInferenceSteps, output
       return {
         ...baseInput,
         aspect_ratio: aspectRatio,
-      };
-    
-    case 'sdxl-lightning-4step':
-      return {
-        prompt: prompt,
-        width: 1024,
-        height: 1024,
-        scheduler: "K_EULER",
-        num_outputs: numOutputs,
-        guidance_scale: 0,
-        // negative_prompt 已移除 - 现代AI模型通过优化提示词自动避免不良输出
-        num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
-        seed: Math.floor(Math.random() * 1000000), // 随机种子
-      };
-    
-    case 'stable-diffusion':
-      return {
-        prompt: prompt,
-        width: 1024,
-        height: 1024,
-        num_outputs: numOutputs,
-        output_format: outputFormat,
-        num_inference_steps: Math.min(numInferenceSteps, modelConfig.maxSteps),
-        guidance_scale: 7.5,
-        scheduler: "K_EULER",
       };
     
     default:
