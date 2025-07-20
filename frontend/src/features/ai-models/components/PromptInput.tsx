@@ -184,7 +184,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   
   const [isQualityEnhanced, setIsQualityEnhanced] = useState(false); // 品质增强独立存储
   const [showFullPrompt, setShowFullPrompt] = useState(false); // 是否显示完整提示词预览
-  const [showAdvanced, setShowAdvanced] = useState(false); // 是否显示高级选项
+  // showAdvanced 已移除 - 高级选项功能已删除
   const [showTemplates, setShowTemplates] = useState(false); // 是否显示场景模板
   const [selectedTemplate, setSelectedTemplate] = useState(''); // 选中的场景模板
   const [showAIAssistant, setShowAIAssistant] = useState(false); // 是否显示AI助手
@@ -336,10 +336,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         setSelectedEnhancements(suggestedTags.enhancements);
       }
       
-      // 自动开启高级选项
-      if (suggestedTags.technical?.length > 0 || suggestedTags.composition?.length > 0) {
-        setShowAdvanced(true);
-      }
+      // 高级选项自动开启逻辑已移除 - 功能已删除
       
       // 自动开启品质增强
       setIsQualityEnhanced(true);
@@ -912,16 +909,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
           📸 场景模板
         </button>
         
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-            showAdvanced
-              ? 'bg-red-500 text-white'
-              : 'bg-red-100 text-red-700 hover:bg-red-200'
-          }`}
-        >
-          {showAdvanced ? '🚫 隐藏负面词' : '🚫 负面提示词'}
-        </button>
+        {/* 负面提示词按钮已移除 - 功能已删除 */}
         
         <button
           onClick={toggleQualityEnhancement}
