@@ -320,12 +320,63 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
   };
 
   const handleCopyPrompt = (prompt: string) => {
-    navigator.clipboard.writeText(prompt);
+    navigator.clipboard.writeText(prompt).then(() => {
+      // 显示复制成功的临时提示
+      const notification = document.createElement('div');
+      notification.textContent = '✅ 提示词已复制到剪贴板';
+      notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-all duration-300';
+      document.body.appendChild(notification);
+      
+      // 3秒后自动移除提示
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(-10px)';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 2000);
+    }).catch(() => {
+      // 复制失败提示
+      const notification = document.createElement('div');
+      notification.textContent = '❌ 复制失败，请重试';
+      notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 2000);
+    });
   };
 
   const handleDeleteBatch = (batchId: string) => {
-    if (confirm('确定要删除这个生成批次吗？')) {
+    // 获取批次信息用于确认提示
+    const batch = generationBatches.find(b => b.id === batchId);
+    const imageCount = batch?.results.length || 0;
+    const promptPreview = batch?.prompt.substring(0, 30) + ((batch?.prompt.length || 0) > 30 ? '...' : '');
+    
+    const confirmMessage = `确定要删除这个生成批次吗？
+
+📝 提示词：${promptPreview}
+🖼️ 包含图片：${imageCount} 张
+⚠️ 删除后无法恢复
+
+点击"确定"继续删除，点击"取消"保留批次。`;
+
+    if (confirm(confirmMessage)) {
       removeBatch(batchId);
+      
+      // 显示删除成功提示
+      const notification = document.createElement('div');
+      notification.textContent = `🗑️ 已删除批次（${imageCount}张图片）`;
+      notification.className = 'fixed top-4 right-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 2000);
     }
   };
 
@@ -599,28 +650,28 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                   <button
                     onClick={() => handleBatchRegenerate(batch)}
                     className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                    title="重新生成这批图片"
+                    title="🔄 重新生成这批图片（使用相同设置）"
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleCopyPrompt(batch.prompt)}
                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="复制提示词"
+                    title="📋 复制提示词到剪贴板"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteBatch(batch.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="删除批次"
+                    title="🗑️ 删除这个批次（不可恢复）"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => toggleBatchCollapse(batch.id)}
                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    title={isCollapsed ? "展开" : "折叠"}
+                    title={isCollapsed ? "📖 展开查看所有图片" : "📚 折叠隐藏图片"}
                   >
                     {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                   </button>
@@ -677,7 +728,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                                 setSelectedBatchId(batch.id);
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
-                              title="查看大图"
+                              title="🔍 点击查看高清大图"
                             >
                               <Maximize2 className="w-5 h-5 text-gray-700" />
                             </button>
@@ -687,17 +738,39 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                                 handleDownload(item.imageUrl, `ai-generated-${batch.createdAt.getTime()}-${index}.png`);
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
-                              title="下载图片"
+                              title="💾 下载图片到本地"
                             >
                               <Download className="w-5 h-5 text-gray-700" />
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // 分享功能
+                                // 复制图片链接到剪贴板
+                                navigator.clipboard.writeText(item.imageUrl).then(() => {
+                                  const notification = document.createElement('div');
+                                  notification.textContent = '🔗 图片链接已复制，可以分享给朋友了';
+                                  notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                                  document.body.appendChild(notification);
+                                  
+                                  setTimeout(() => {
+                                    notification.style.opacity = '0';
+                                    setTimeout(() => {
+                                      document.body.removeChild(notification);
+                                    }, 300);
+                                  }, 2000);
+                                }).catch(() => {
+                                  const notification = document.createElement('div');
+                                  notification.textContent = '❌ 复制链接失败，请重试';
+                                  notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                                  document.body.appendChild(notification);
+                                  
+                                  setTimeout(() => {
+                                    document.body.removeChild(notification);
+                                  }, 2000);
+                                });
                               }}
                               className="p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
-                              title="分享图片"
+                              title="🔗 复制图片链接，方便分享"
                             >
                               <Share2 className="w-5 h-5 text-gray-700" />
                             </button>
@@ -728,7 +801,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                               ? 'bg-green-500 text-white shadow-green-200' 
                               : 'bg-white hover:bg-green-50 text-gray-700 border border-gray-200 hover:border-green-300'
                           }`}
-                          title={batchFeedback === 'like' ? "取消点赞这批图片" : "点赞这批图片"}
+                          title={batchFeedback === 'like' ? "👍 已点赞，点击取消" : "👍 觉得这批图片不错？点个赞吧"}
                         >
                           <ThumbsUp className="w-5 h-5" />
                         </button>
@@ -742,7 +815,7 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                               ? 'bg-red-500 text-white shadow-red-200' 
                               : 'bg-white hover:bg-red-50 text-gray-700 border border-gray-200 hover:border-red-300'
                           }`}
-                          title={batchFeedback === 'dislike' ? "取消踩这批图片" : "踩这批图片"}
+                          title={batchFeedback === 'dislike' ? "👎 已标记不满意，点击取消" : "👎 图片效果不理想？标记一下帮助改进"}
                         >
                           <ThumbsDown className="w-5 h-5" />
                         </button>
