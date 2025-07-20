@@ -10,7 +10,8 @@ import type {
   ImageFeedback,
   FeedbackType,
   TagRecommendation,
-  PopularTagsAnalysis
+  PopularTagsAnalysis,
+  PromptTranslation
 } from '../types/database';
 
 /**
@@ -1482,5 +1483,186 @@ export class DatabaseService {
       dislikes_given: dislikesGiven,
       feedback_rate: feedbackRate,
     };
+  }
+
+  // ===== 翻译缓存相关方法 =====
+
+  /**
+   * 生成提示词哈希值
+   */
+  private generatePromptHash(prompt: string): string {
+    // 简单的哈希算法，实际项目中可以使用更复杂的哈希函数
+    let hash = 0;
+    for (let i = 0; i < prompt.length; i++) {
+      const char = prompt.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // 转换为32位整数
+    }
+    return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * 从缓存获取翻译结果
+   */
+  async getTranslationFromCache(originalPrompt: string): Promise<PromptTranslation | null> {
+    const promptHash = this.generatePromptHash(originalPrompt.trim().toLowerCase());
+    
+    try {
+      const { data, error } = await supabase
+        .from('prompt_translations')
+        .select('*')
+        .eq('original_prompt_hash', promptHash)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // 没有找到缓存，返回null
+          return null;
+        }
+        console.error('获取翻译缓存失败:', error);
+        return null;
+      }
+
+      console.log('🎯 命中翻译缓存');
+      return data;
+    } catch (error) {
+      console.error('查询翻译缓存异常:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 保存翻译结果到缓存
+   */
+  async saveTranslationToCache(translationData: {
+    originalPrompt: string;
+    translatedPrompt: string;
+    explanation?: string;
+    keyTerms?: Array<{english: string, chinese: string}>;
+    confidence?: number;
+  }): Promise<PromptTranslation | null> {
+    const promptHash = this.generatePromptHash(translationData.originalPrompt.trim().toLowerCase());
+    
+    try {
+      const { data, error } = await supabase
+        .from('prompt_translations')
+        .upsert({
+          original_prompt: translationData.originalPrompt,
+          original_prompt_hash: promptHash,
+          translated_prompt: translationData.translatedPrompt,
+          translation_explanation: translationData.explanation || null,
+          key_terms: translationData.keyTerms || [],
+          confidence: translationData.confidence || 95,
+        }, {
+          onConflict: 'original_prompt_hash'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('保存翻译缓存失败:', error);
+        return null;
+      }
+
+      console.log('💾 翻译结果已缓存');
+      return data;
+    } catch (error) {
+      console.error('保存翻译缓存异常:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 翻译英文提示词（带缓存）
+   */
+  async translatePrompt(englishPrompt: string): Promise<{
+    originalPrompt: string;
+    chineseTranslation: string;
+    explanation?: string;
+    keyTerms?: Array<{english: string, chinese: string}>;
+    confidence: number;
+    fromCache: boolean;
+  }> {
+    // 1. 先查询缓存
+    const cachedResult = await this.getTranslationFromCache(englishPrompt);
+    if (cachedResult) {
+      return {
+        originalPrompt: cachedResult.original_prompt,
+        chineseTranslation: cachedResult.translated_prompt,
+        explanation: cachedResult.translation_explanation,
+        keyTerms: cachedResult.key_terms,
+        confidence: cachedResult.confidence,
+        fromCache: true
+      };
+    }
+
+    // 2. 缓存未命中，调用API翻译
+    console.log('🌐 缓存未命中，调用翻译API...');
+    try {
+      const response = await fetch('/.netlify/functions/translate-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ englishPrompt })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`翻译API失败: ${response.status} - ${errorData.error || 'Unknown error'}`);
+      }
+
+      const apiResult = await response.json();
+      
+      // 3. 保存到缓存
+      await this.saveTranslationToCache({
+        originalPrompt: englishPrompt,
+        translatedPrompt: apiResult.chineseTranslation,
+        explanation: apiResult.explanation,
+        keyTerms: apiResult.keyTerms,
+        confidence: apiResult.confidence
+      });
+
+      return {
+        originalPrompt: apiResult.originalPrompt,
+        chineseTranslation: apiResult.chineseTranslation,
+        explanation: apiResult.explanation,
+        keyTerms: apiResult.keyTerms,
+        confidence: apiResult.confidence,
+        fromCache: false
+      };
+      
+    } catch (error) {
+      console.error('翻译失败:', error);
+      // 返回降级结果
+      return {
+        originalPrompt: englishPrompt,
+        chineseTranslation: `[翻译] ${englishPrompt}`,
+        explanation: '翻译服务暂时不可用',
+        keyTerms: [],
+        confidence: 0,
+        fromCache: false
+      };
+    }
+  }
+
+  /**
+   * 清理过期的翻译缓存（可定期调用）
+   */
+  async cleanupOldTranslations(daysOld: number = 30): Promise<void> {
+    const cutoffDate = new Date(Date.now() - (daysOld * 24 * 60 * 60 * 1000)).toISOString();
+    
+    try {
+      const { error } = await supabase
+        .from('prompt_translations')
+        .delete()
+        .lt('created_at', cutoffDate);
+        
+      if (error) {
+        console.error('清理翻译缓存失败:', error);
+      } else {
+        console.log(`🧹 已清理${daysOld}天前的翻译缓存`);
+      }
+    } catch (error) {
+      console.error('清理翻译缓存异常:', error);
+    }
   }
 }

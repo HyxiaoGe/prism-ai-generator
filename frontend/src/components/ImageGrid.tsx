@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown, X } from 'lucide-react';
+import { Download, Heart, Share2, Maximize2, Copy, Trash2, Sparkles, Clock, Image, ChevronDown, ChevronUp, RotateCcw, ThumbsUp, ThumbsDown, X, Languages } from 'lucide-react';
 import { useAIGenerationStore } from '../store/aiGenerationStore';
 import { parsePromptFeatures } from '../features/ai-models/utils/promptParser';
 import { DatabaseService } from '../services/database';
@@ -143,6 +143,19 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
     batchId: '',
     batchInfo: null
   });
+  
+  // 翻译功能状态
+  const [translations, setTranslations] = useState<Record<string, {
+    isLoading: boolean;
+    result: {
+      chineseTranslation: string;
+      explanation?: string;
+      keyTerms?: Array<{english: string, chinese: string}>;
+      confidence: number;
+      fromCache: boolean;
+    } | null;
+    error: string | null;
+  }>>({});
   const gridRef = useRef<HTMLDivElement>(null);
 
   // 计算瀑布流列数
@@ -420,6 +433,77 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [deleteConfirm.isOpen]);
+
+  // 翻译提示词功能
+  const handleTranslatePrompt = async (batchId: string, prompt: string) => {
+    // 检查是否已有翻译结果
+    if (translations[batchId]?.result) {
+      return;
+    }
+
+    // 设置加载状态
+    setTranslations(prev => ({
+      ...prev,
+      [batchId]: {
+        isLoading: true,
+        result: null,
+        error: null
+      }
+    }));
+
+    try {
+      const databaseService = DatabaseService.getInstance();
+      const result = await databaseService.translatePrompt(prompt);
+      
+      // 设置翻译结果
+      setTranslations(prev => ({
+        ...prev,
+        [batchId]: {
+          isLoading: false,
+          result: result,
+          error: null
+        }
+      }));
+
+      // 显示翻译完成提示
+      const notification = document.createElement('div');
+      notification.textContent = result.fromCache 
+        ? '🎯 从缓存获取翻译结果' 
+        : '🌐 翻译完成';
+      notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 2000);
+
+    } catch (error) {
+      console.error('翻译失败:', error);
+      
+      // 设置错误状态
+      setTranslations(prev => ({
+        ...prev,
+        [batchId]: {
+          isLoading: false,
+          result: null,
+          error: error instanceof Error ? error.message : '翻译失败'
+        }
+      }));
+
+      // 显示错误提示
+      const notification = document.createElement('div');
+      notification.textContent = '❌ 翻译失败，请重试';
+      notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 2000);
+    }
+  };
 
   // 处理批次重新生成
   const handleBatchRegenerate = (batch: any) => {
@@ -703,6 +787,26 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
+                    onClick={() => handleTranslatePrompt(batch.id, batch.prompt)}
+                    disabled={translations[batch.id]?.isLoading}
+                    className={`p-2 rounded-lg transition-colors ${
+                      translations[batch.id]?.isLoading
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : translations[batch.id]?.result
+                        ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                        : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                    title={
+                      translations[batch.id]?.isLoading
+                        ? '🌐 翻译中...'
+                        : translations[batch.id]?.result
+                        ? '✅ 已翻译，点击查看详情'
+                        : '🌐 翻译提示词为中文'
+                    }
+                  >
+                    <Languages className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleDeleteBatch(batch.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="🗑️ 删除这个批次（不可恢复）"
@@ -723,6 +827,62 @@ export function ImageGrid({ viewMode, onRegenerate }: ImageGridProps) {
             {/* 批次内容 */}
             {!isCollapsed && (
               <div className="p-6 relative">
+                {/* 翻译结果显示 */}
+                {translations[batch.id]?.result && (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Languages className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h4 className="font-medium text-blue-900">中文翻译</h4>
+                          {translations[batch.id]?.result?.fromCache && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              缓存
+                            </span>
+                          )}
+                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                            {translations[batch.id]?.result?.confidence}% 置信度
+                          </span>
+                        </div>
+                        <p className="text-blue-800 mb-3 leading-relaxed">
+                          {translations[batch.id]?.result?.chineseTranslation}
+                        </p>
+                        
+                        {translations[batch.id]?.result?.explanation && (
+                          <div className="mb-3">
+                            <p className="text-sm text-blue-700">
+                              <span className="font-medium">说明：</span>
+                              {translations[batch.id]?.result?.explanation}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {(() => {
+                          const keyTerms = translations[batch.id]?.result?.keyTerms;
+                          if (!keyTerms || keyTerms.length === 0) return null;
+                          
+                          return (
+                            <div>
+                              <p className="text-sm font-medium text-blue-900 mb-2">关键术语对照：</p>
+                              <div className="flex flex-wrap gap-2">
+                                {keyTerms.map((term: any, index: number) => (
+                                  <div key={index} className="px-3 py-1 bg-white border border-blue-200 rounded-full text-xs">
+                                    <span className="text-blue-600 font-medium">{term.english}</span>
+                                    <span className="text-gray-500 mx-1">→</span>
+                                    <span className="text-blue-800">{term.chinese}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div
                   ref={gridRef}
                   className={`

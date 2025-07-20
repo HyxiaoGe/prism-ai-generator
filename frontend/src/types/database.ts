@@ -84,6 +84,19 @@ export interface ImageFeedback {
 // 反馈类型枚举
 export type FeedbackType = 'like' | 'dislike' | null;
 
+// 新增：翻译缓存表
+export interface PromptTranslation {
+  id: string;
+  original_prompt: string;
+  original_prompt_hash: string;
+  translated_prompt: string;
+  translation_explanation?: string;
+  key_terms: Array<{english: string, chinese: string}>;
+  confidence: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // 扩展用户使用统计，增加反馈统计
 export interface UserUsageStats {
   daily: {
