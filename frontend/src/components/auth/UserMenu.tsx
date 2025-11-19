@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuthStore } from '../../store/authStore';
 import { AccountSettings } from './AccountSettings';
 
@@ -11,6 +12,8 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [showLoginOptions, setShowLoginOptions] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -40,18 +43,24 @@ export function UserMenu() {
   // 处理 GitHub 登录
   const handleGitHubLogin = async () => {
     try {
+      setIsLoggingIn(true);
+      setShowLoginOptions(false);
       await loginWithGitHub();
     } catch (error) {
       console.error('GitHub 登录失败:', error);
+      setIsLoggingIn(false);
     }
   };
 
   // 处理 Google 登录
   const handleGoogleLogin = async () => {
     try {
+      setIsLoggingIn(true);
+      setShowLoginOptions(false);
       await loginWithGoogle();
     } catch (error) {
       console.error('Google 登录失败:', error);
+      setIsLoggingIn(false);
     }
   };
 
@@ -77,14 +86,27 @@ export function UserMenu() {
     return (
       <div className="relative" ref={menuRef}>
         <button
-          onClick={() => setShowLoginOptions(!showLoginOptions)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all"
+          onClick={() => !isLoggingIn && setShowLoginOptions(!showLoginOptions)}
+          disabled={isLoggingIn}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg transition-all ${
+            isLoggingIn ? 'opacity-70 cursor-wait' : 'hover:from-purple-700 hover:to-blue-700'
+          }`}
         >
-          登录
+          {isLoggingIn ? (
+            <>
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              登录中...
+            </>
+          ) : (
+            '登录'
+          )}
         </button>
 
         {/* 登录选项下拉 */}
-        {showLoginOptions && (
+        {showLoginOptions && !isLoggingIn && (
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
             <button
               onClick={handleGitHubLogin}
@@ -117,6 +139,11 @@ export function UserMenu() {
   const displayName = appUser?.display_name || appUser?.email || '用户';
   const avatarUrl = appUser?.avatar_url;
 
+  // 当 avatarUrl 变化时重置加载状态
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [avatarUrl]);
+
   return (
     <div className="relative" ref={menuRef}>
       {/* 头像按钮 */}
@@ -125,11 +152,20 @@ export function UserMenu() {
         className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 transition-colors"
       >
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-8 h-8 rounded-full"
-          />
+          <div className="relative w-8 h-8">
+            {/* 图片未加载时显示渐变占位符 */}
+            {!imageLoaded && (
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-sm font-medium">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className={`w-8 h-8 rounded-full transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setImageLoaded(true)}
+            />
+          </div>
         ) : (
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-sm font-medium">
             {displayName.charAt(0).toUpperCase()}
@@ -222,9 +258,10 @@ export function UserMenu() {
         </div>
       )}
 
-      {/* 账号设置模态框 */}
-      {showAccountSettings && (
-        <AccountSettings onClose={() => setShowAccountSettings(false)} />
+      {/* 账号设置模态框 - 使用 Portal 渲染到 body 以确保居中显示 */}
+      {showAccountSettings && createPortal(
+        <AccountSettings onClose={() => setShowAccountSettings(false)} />,
+        document.body
       )}
     </div>
   );
