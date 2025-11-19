@@ -40,6 +40,12 @@ export function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 当 avatarUrl 变化时重置加载状态
+  const avatarUrl = appUser?.avatar_url;
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [avatarUrl]);
+
   // 处理 GitHub 登录
   const handleGitHubLogin = async () => {
     try {
@@ -137,12 +143,6 @@ export function UserMenu() {
 
   // 已登录 - 显示用户头像和下拉菜单
   const displayName = appUser?.display_name || appUser?.email || '用户';
-  const avatarUrl = appUser?.avatar_url;
-
-  // 当 avatarUrl 变化时重置加载状态
-  useEffect(() => {
-    setImageLoaded(false);
-  }, [avatarUrl]);
 
   return (
     <div className="relative" ref={menuRef}>
