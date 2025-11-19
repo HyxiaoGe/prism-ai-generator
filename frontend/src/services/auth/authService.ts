@@ -176,8 +176,9 @@ export class AuthService {
 
     const provider = this.getProviderFromUser(supabaseUser);
     const providerId = supabaseUser.id;
+    const email = supabaseUser.email;
 
-    // 检查是否已有对应的应用用户
+    // 1. 检查该 OAuth 提供商是否已有用户
     let appUser = await this.userRepository.findByAuthProvider(provider, providerId);
 
     if (appUser) {
@@ -186,7 +187,39 @@ export class AuthService {
       return appUser;
     }
 
-    // 创建新的应用用户
+    // 2. 检查邮箱是否已有用户（邮箱关联）
+    if (email) {
+      const existingUserByEmail = await this.userRepository.findByEmail(email);
+
+      if (existingUserByEmail) {
+        // 邮箱已存在，将新的认证方式绑定到现有用户
+        console.log(`🔗 邮箱关联: 将 ${provider} 账号绑定到现有用户 (${email})`);
+
+        const metadata = supabaseUser.user_metadata || {};
+        await this.userRepository.linkAuthAccount(
+          existingUserByEmail.id,
+          provider,
+          providerId,
+          {
+            providerEmail: email,
+            providerData: metadata,
+          }
+        );
+
+        // 如果现有用户配额较低，升级配额
+        if (existingUserByEmail.daily_quota < 50 && (provider === 'github' || provider === 'google')) {
+          await this.userRepository.upgradeUserQuota(existingUserByEmail.id, provider);
+        }
+
+        // 合并匿名数据
+        await this.mergeAnonymousDataIfNeeded(existingUserByEmail.id);
+
+        // 返回更新后的用户
+        return await this.userRepository.findById(existingUserByEmail.id);
+      }
+    }
+
+    // 3. 创建新用户
     appUser = await this.createAppUserFromSupabase(supabaseUser);
 
     // 合并匿名数据
