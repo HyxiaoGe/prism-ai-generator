@@ -3,98 +3,23 @@ import { devtools } from 'zustand/middleware';
 import { AIService } from '../features/ai-models/services/aiService';
 import { UsageTracker } from '../features/usage-tracking/services/usageTracker';
 import { DatabaseService } from '../services/database';
-import { getTagDisplayName } from '../constants/tags';
-import type {
-  GenerationConfig,
-  GenerationResult,
-  GenerationStatus,
-  AIModel
-} from '../types';
-import type { UserUsageStats, TagCategory } from '../types/database';
+import type { GenerationConfig, GenerationResult } from '../types';
+import type { AIGenerationState, GenerationBatch } from './types';
+import {
+  initialGenerationStatus,
+  defaultConfig,
+  initialPagination,
+} from './types';
+import {
+  uploadImagesToR2,
+  extractTagsFromConfig,
+  saveGenerationToDatabase,
+  convertRecordsToBatches,
+  generateBatchId,
+} from './utils/generationUtils';
 
-// 生成批次接口
-interface GenerationBatch {
-  id: string;
-  prompt: string;
-  config: GenerationConfig;
-  results: GenerationResult[];
-  createdAt: Date;
-  model: string;
-  // 新增：真实的数据库generation_id（UUID格式）
-  realGenerationId?: string;
-  // 🔥 新增：标签数据
-  tags_used?: Array<{name: string, category: string, value: string}>;
-}
-
-interface AIGenerationState {
-  // 状态
-  currentGeneration: GenerationStatus;
-  generationHistory: GenerationResult[]; // 保持兼容性
-  generationBatches: GenerationBatch[]; // 新增：按批次分组
-  selectedModel: AIModel | null;
-  availableModels: AIModel[];
-  
-  // 配置
-  currentConfig: Partial<GenerationConfig>;
-  
-  // 用量追踪
-  usageStats: UserUsageStats | null;
-  
-  // 加载状态
-  isLoading: boolean;
-  
-  // 📄 新增：分页状态
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    total: number;
-    hasMore: boolean;
-    isLoadingMore: boolean;
-  };
-  
-  // Actions
-  setSelectedModel: (model: AIModel) => void;
-  updateConfig: (config: Partial<GenerationConfig>) => void;
-  startGeneration: (config: GenerationConfig) => Promise<void>;
-  updateProgress: (progress: number, stage?: GenerationStatus['stage']) => void;
-  completeGeneration: (results: GenerationResult[]) => void;
-  failGeneration: (error: string) => void;
-  cancelGeneration: () => void;
-  clearHistory: () => void;
-  removeFromHistory: (id: string) => void;
-  removeBatch: (batchId: string) => void; // 新增：删除批次
-  setAvailableModels: (models: AIModel[]) => void;
-  updateUsageStats: () => Promise<void>;
-  loadHistoryFromDatabase: () => Promise<void>; // 新增：从数据库加载历史记录
-  // 📄 新增：分页方法
-  loadHistoryWithPagination: (page?: number, replace?: boolean) => Promise<void>;
-  loadMoreHistory: () => Promise<void>;
-  resetPagination: () => void;
-  setLoading: (loading: boolean) => void;
-  prepareRegeneration: (result: GenerationResult) => Promise<void>; // 新增：准备重新生成
-  updateImageFeedback: (batchId: string, resultIndex: number, feedback: { type: 'like' | 'dislike' | null, submittedAt?: Date }) => void; // 新增：更新图片反馈
-  loadFeedbackStates: () => Promise<void>; // 新增：加载反馈状态
-}
-
-const initialGenerationStatus: GenerationStatus = {
-  isGenerating: false,
-  progress: 0,
-  stage: 'idle',
-  error: null,
-};
-
-const defaultConfig: Partial<GenerationConfig> = {
-  aspectRatio: '1:1',
-  numOutputs: 4,
-  outputFormat: 'webp',
-  numInferenceSteps: 4,
-  model: 'flux-schnell',
-  // 兼容性字段
-  width: 1024,
-  height: 1024,
-  steps: 4,
-  guidance: 7.5,
-};
+// 重新导出类型供外部使用
+export type { GenerationBatch } from './types';
 
 export const useAIGenerationStore = create<AIGenerationState>()(
   devtools(
@@ -108,14 +33,8 @@ export const useAIGenerationStore = create<AIGenerationState>()(
       currentConfig: defaultConfig,
       usageStats: null,
       isLoading: false,
-      // 📄 分页状态
-      pagination: {
-        currentPage: 1,
-        totalPages: 1,
-        total: 0,
-        hasMore: false,
-        isLoadingMore: false,
-      },
+      // 分页状态
+      pagination: initialPagination,
 
       // Actions
       setSelectedModel: (model) => 
@@ -246,11 +165,11 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
       completeGeneration: (results) => {
         const state = get();
-        const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+        const batchId = generateBatchId();
+
         // 获取提示词 - 优先从results中获取，然后从currentConfig
         const prompt = results.length > 0 ? results[0].prompt : (state.currentConfig.prompt || '');
-        
+
         // 创建新的生成批次
         const newBatch: GenerationBatch = {
           id: batchId,
@@ -264,215 +183,56 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         // 异步保存到数据库（不阻塞UI）
         const saveToDatabase = async () => {
           try {
-            const databaseService = DatabaseService.getInstance();
-            
-            // 获取模型成本
-            const models = await AIService.getAvailableModels();
-            const model = models.find(m => m.id === state.currentConfig.model);
-            const modelCost = model?.costPerGeneration || 0;
+            // 上传图片到R2存储
+            const uploadedResults = await uploadImagesToR2(results, prompt, batchId);
 
-            // 🔥 新增：上传图片到R2存储
-            let uploadedResults = results;
-            try {
-              console.log('🚀 开始上传图片到R2存储...');
-              const imageUrls = results.map(result => result.imageUrl);
-              const uploadResponse = await fetch('/.netlify/functions/upload-to-r2', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  imageUrls,
-                  prompt: prompt,
-                  batchId: batchId,
-                }),
-              });
-
-              if (uploadResponse.ok || uploadResponse.status === 206) {
-                const uploadData = await uploadResponse.json();
-                console.log('✅ R2上传响应:', uploadData);
-                
-                // 更新results，添加R2 URL信息
-                uploadedResults = results.map((result, index) => {
-                  const r2Result = uploadData.data.results[index];
-                  if (!r2Result) return result;
-
-                  // 🔥 优先使用publicUrl，其次使用签名URL，最后使用原始URL
-                  const bestUrl = r2Result.publicUrl || r2Result.url || result.imageUrl;
-
-                  return {
-                    ...result,
-                    // 保留原始URL作为备用
-                    originalImageUrl: result.imageUrl,
-                    // 🔥 优先使用公共URL
-                    imageUrl: bestUrl,
-                    // 添加R2相关信息
-                    r2Info: {
-                      key: r2Result.key,
-                      url: r2Result.url,
-                      publicUrl: r2Result.publicUrl,
-                      size: r2Result.size,
-                      etag: r2Result.etag,
-                    },
-                  };
-                });
-
-                // 更新状态中的批次数据
-                set((state) => ({
-                  generationBatches: state.generationBatches.map(batch => 
-                    batch.id === batchId 
-                      ? { ...batch, results: uploadedResults }
-                      : batch
-                  ),
-                }), false, 'updateBatchWithR2Urls');
-
-                // 显示成功或部分成功消息
-                if (uploadResponse.status === 206 && uploadData.warnings) {
-                  console.warn('⚠️ 部分上传警告:', uploadData.warnings);
-                  console.log(`📊 上传统计: ${uploadData.data.uploadedCount}/${uploadData.data.totalCount} 成功`);
-                } else {
-                  console.log('✅ 所有图片上传成功');
-                }
-              } else {
-                const errorText = await uploadResponse.text().catch(() => '未知错误');
-                console.error('❌ R2上传失败:', {
-                  status: uploadResponse.status,
-                  error: errorText
-                });
-                // 保持原始URL，不阻塞整个流程
-                console.log('🔄 保持使用原始临时URL');
-              }
-            } catch (r2Error) {
-              console.error('❌ R2上传过程中出错:', r2Error);
-              // 即使R2上传失败，也继续保存到数据库
+            // 更新状态中的批次数据
+            if (uploadedResults !== results) {
+              set((state) => ({
+                generationBatches: state.generationBatches.map(batch =>
+                  batch.id === batchId
+                    ? { ...batch, results: uploadedResults }
+                    : batch
+                ),
+              }), false, 'updateBatchWithR2Urls');
             }
-            
-            // 将选择的标签转换为数据库所需的格式
-            const tagsUsed: Array<{name: string, category: TagCategory, value: string}> = [];
-            const selectedTags = state.currentConfig.selectedTags;
-            
 
-            
-            if (selectedTags) {
-              // 艺术风格
-              if (selectedTags.artStyle) {
-                tagsUsed.push({
-                  name: getTagDisplayName(selectedTags.artStyle),
-                  category: 'art_style' as const,
-                  value: selectedTags.artStyle
-                });
-              }
-              
-              // 主题风格
-              if (selectedTags.themeStyle) {
-                tagsUsed.push({
-                  name: getTagDisplayName(selectedTags.themeStyle),
-                  category: 'theme_style' as const,
-                  value: selectedTags.themeStyle
-                });
-              }
-              
-              // 情绪氛围
-              if (selectedTags.mood) {
-                tagsUsed.push({
-                  name: getTagDisplayName(selectedTags.mood),
-                  category: 'mood' as const,
-                  value: selectedTags.mood
-                });
-              }
-              
-              // 技术参数
-              if (selectedTags.technical) {
-                selectedTags.technical.forEach(tech => {
-                  tagsUsed.push({
-                    name: getTagDisplayName(tech),
-                    category: 'technical' as const,
-                    value: tech
-                  });
-                });
-              }
-              
-              // 构图参数
-              if (selectedTags.composition) {
-                selectedTags.composition.forEach(comp => {
-                  tagsUsed.push({
-                    name: getTagDisplayName(comp),
-                    category: 'composition' as const,
-                    value: comp
-                  });
-                });
-              }
-              
-              // 增强属性
-              if (selectedTags.enhancement) {
-                selectedTags.enhancement.forEach(enh => {
-                  tagsUsed.push({
-                    name: getTagDisplayName(enh),
-                    category: 'enhancement' as const,
-                    value: enh
-                  });
-                });
-              }
-              
-              // 负面提示词功能已移除 - 现代AI模型通过优化提示词自动避免不良输出
-              
-              // 品质增强
-              if (selectedTags.isQualityEnhanced) {
-                tagsUsed.push({
-                  name: '品质增强',
-                  category: 'enhancement' as const,
-                  value: 'high quality, detailed, masterpiece, best quality, 4k resolution'
-                });
-              }
-            }
-            
+            // 提取标签数据
+            const tagsUsed = extractTagsFromConfig(state.currentConfig);
 
-            
-            const savedGeneration = await databaseService.saveGeneration({
-              prompt: prompt,
-              model_name: state.currentConfig.model || 'flux-schnell',
-              model_cost: modelCost,
-              image_urls: uploadedResults.map(r => r.imageUrl), // 🔥 使用R2 URL
-              status: 'completed',
-              is_public: true,
-              tags_used: tagsUsed, // 传递标签信息
-              // 🔥 新增：保存R2相关信息
-              original_image_urls: uploadedResults.map(r => r.originalImageUrl).filter((url): url is string => Boolean(url)),
-              r2_keys: uploadedResults.map(r => r.r2Info?.key).filter((key): key is string => Boolean(key)),
-              r2_data: uploadedResults.map(r => r.r2Info).filter(Boolean),
-            });
+            // 保存到数据库
+            const savedGeneration = await saveGenerationToDatabase(
+              prompt,
+              state.currentConfig,
+              uploadedResults,
+              tagsUsed
+            );
 
             // 更新批次和结果的真实 generation_id
             if (savedGeneration && savedGeneration.id) {
-              // 更新批次的 realGenerationId
               set((state) => ({
-                generationBatches: state.generationBatches.map(batch => 
-                  batch.id === batchId ? { 
-                    ...batch, 
+                generationBatches: state.generationBatches.map(batch =>
+                  batch.id === batchId ? {
+                    ...batch,
                     realGenerationId: savedGeneration.id,
-                    // 🔥 修复：添加标签数据到批次
                     tags_used: tagsUsed,
                     results: batch.results.map(result => ({
                       ...result,
                       realGenerationId: savedGeneration.id,
-                      // 🔥 修复：添加标签数据到结果
                       tags_used: tagsUsed
                     }))
                   } : batch
                 ),
                 // 同步更新 generationHistory
-                generationHistory: state.generationHistory.map(historyItem => 
+                generationHistory: state.generationHistory.map(historyItem =>
                   results.some(result => result.id === historyItem.id) ? {
                     ...historyItem,
                     realGenerationId: savedGeneration.id,
-                    // 🔥 修复：添加标签数据到历史记录
                     tags_used: tagsUsed
                   } : historyItem
                 )
               }), false, 'updateRealGenerationId');
-              
             }
-
-            // 更新提示词统计
-            await databaseService.updatePromptStats(prompt);
           } catch (dbError) {
             console.error('❌ 保存生成记录失败:', dbError);
           }
@@ -557,94 +317,19 @@ export const useAIGenerationStore = create<AIGenerationState>()(
       loadHistoryFromDatabase: async () => {
         // 设置加载状态
         set({ isLoading: true }, false, 'setLoading');
-        
+
         try {
           const databaseService = DatabaseService.getInstance();
           const records = await databaseService.getUserGenerations();
-          
+
           if (records.length === 0) {
             set({ isLoading: false }, false, 'setLoading');
             return;
           }
-          
-          // 按提示词和时间分组创建批次
-          const batchesMap = new Map<string, GenerationBatch>();
-          const historyResults: GenerationResult[] = [];
-          
-          // 按时间降序排列
-          records.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          for (const record of records) {
-            // 处理时区转换：Supabase存储UTC时间，转换为本地时间
-            const utcDate = new Date(record.created_at);
-            const localDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000)); // UTC+8
-            
-            // 处理图片URLs数组，为每张图片创建单独的结果
-            const imageUrls = Array.isArray(record.image_urls) ? record.image_urls : [record.image_urls];
-            
-            // 为每张图片创建GenerationResult对象
-            const batchResults: GenerationResult[] = [];
-            imageUrls.forEach((imageUrl, index) => {
-              const result: GenerationResult = {
-                id: `${record.id}_${index}`, // 为每张图片创建唯一ID
-                imageUrl: imageUrl,
-                prompt: record.prompt,
-                createdAt: localDate,
-                status: record.status as 'completed' | 'failed',
-                config: {
-                  model: record.model_name,
-                  prompt: record.prompt,
-                  aspectRatio: '1:1',
-                  numOutputs: imageUrls.length,
-                  outputFormat: 'webp',
-                  numInferenceSteps: 4,
-                  width: 1024,
-                  height: 1024,
-                  steps: 4,
-                  guidance: 7.5,
-                },
-                // 初始化反馈状态为未设置
-                userFeedback: undefined,
-                // 保存真实的数据库generation_id
-                realGenerationId: record.id,
-                // 🔥 修复：传递标签数据
-                tags_used: record.tags_used || []
-              };
-              
-              batchResults.push(result);
-              historyResults.push(result);
-            });
-            
-            // 创建批次键：基于提示词和时间（精确到分钟）
-            const timeKey = localDate.toISOString().substring(0, 16);
-            const batchKey = `${record.prompt}_${timeKey}`;
-            
-            if (!batchesMap.has(batchKey)) {
-              // 创建新批次
-              const batch: GenerationBatch = {
-                id: `batch_${record.id}_${Math.random().toString(36).substr(2, 9)}`,
-                prompt: record.prompt,
-                config: batchResults[0].config,
-                results: batchResults, // 包含所有图片
-                createdAt: localDate,
-                model: record.model_name,
-                // 保存真实的数据库generation_id
-                realGenerationId: record.id,
-                // 🔥 修复：传递标签数据
-                tags_used: record.tags_used || []
-              };
-              batchesMap.set(batchKey, batch);
-            } else {
-              // 添加到现有批次
-              const existingBatch = batchesMap.get(batchKey)!;
-              existingBatch.results.push(...batchResults);
-            }
-          }
-          
-          // 转换为数组并按时间降序排序
-          const batches = Array.from(batchesMap.values())
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-          
+
+          // 使用辅助函数转换记录为批次
+          const { batches, historyResults } = convertRecordsToBatches(records);
+
           // 更新状态
           set(
             {
@@ -655,12 +340,10 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             false,
             'loadHistoryFromDatabase'
           );
-          
 
-          
           // 异步加载反馈状态
           get().loadFeedbackStates().catch(console.error);
-          
+
         } catch (error) {
           console.error('❌ 从数据库加载历史记录失败:', error);
           // 即使出错也要清除加载状态
@@ -843,11 +526,11 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         }
       },
 
-      // 📄 新增：分页方法实现
+      // 分页方法实现
       loadHistoryWithPagination: async (page = 1, replace = false) => {
         try {
           const databaseService = DatabaseService.getInstance();
-          
+
           // 设置加载状态
           if (replace) {
             set({ isLoading: true }, false, 'loadHistoryWithPagination');
@@ -861,97 +544,21 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
           // 获取分页数据
           const result = await databaseService.getUserGenerationsWithPagination({ page, limit: 10 });
-          
+
           if (result.data.length === 0 && page === 1) {
             // 第一页没有数据
             set({
               generationHistory: [],
               generationBatches: [],
               isLoading: false,
-              pagination: {
-                currentPage: 1,
-                totalPages: 1,
-                total: 0,
-                hasMore: false,
-                isLoadingMore: false,
-              }
+              pagination: initialPagination
             }, false, 'loadHistoryWithPagination');
             return;
           }
 
-          // 处理数据，转换为批次格式
-          const batchesMap = new Map<string, GenerationBatch>();
-          const historyResults: GenerationResult[] = [];
-          
-          // 按时间降序排列
-          result.data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          for (const record of result.data) {
-            // 处理时区转换
-            const utcDate = new Date(record.created_at);
-            const localDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000)); // UTC+8
-            
-            // 处理图片URLs数组
-            const imageUrls = Array.isArray(record.image_urls) ? record.image_urls : [record.image_urls];
-            
-            // 为每张图片创建GenerationResult对象
-            const batchResults: GenerationResult[] = [];
-            imageUrls.forEach((imageUrl, index) => {
-              const result: GenerationResult = {
-                id: `${record.id}_${index}`,
-                imageUrl: imageUrl,
-                prompt: record.prompt,
-                createdAt: localDate,
-                status: record.status as 'completed' | 'failed',
-                config: {
-                  model: record.model_name,
-                  prompt: record.prompt,
-                  aspectRatio: '1:1',
-                  numOutputs: imageUrls.length,
-                  outputFormat: 'webp',
-                  numInferenceSteps: 4,
-                  width: 1024,
-                  height: 1024,
-                  steps: 4,
-                  guidance: 7.5,
-                },
-                userFeedback: undefined,
-                realGenerationId: record.id,
-                // 🔥 修复：传递标签数据
-                tags_used: record.tags_used || []
-              };
-              
-              batchResults.push(result);
-              historyResults.push(result);
-            });
-            
-            // 创建批次
-            const timeKey = localDate.toISOString().substring(0, 16);
-            const batchKey = `${record.prompt}_${timeKey}`;
-            
-            if (!batchesMap.has(batchKey)) {
-              const batch: GenerationBatch = {
-                id: `batch_${record.id}_${Math.random().toString(36).substr(2, 9)}`,
-                prompt: record.prompt,
-                config: batchResults[0].config,
-                results: batchResults,
-                createdAt: localDate,
-                model: record.model_name,
-                realGenerationId: record.id,
-                // 🔥 修复：传递标签数据
-                tags_used: record.tags_used || []
-              };
-              batchesMap.set(batchKey, batch);
-            } else {
-              const existingBatch = batchesMap.get(batchKey)!;
-              existingBatch.results.push(...batchResults);
-            }
-          }
-          
-          // 转换为数组并排序
-          const newBatches = Array.from(batchesMap.values())
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-          
+          // 使用辅助函数转换记录为批次
+          const { batches: newBatches, historyResults } = convertRecordsToBatches(result.data);
+
           // 更新状态
           set((state) => ({
             generationHistory: replace ? historyResults : [...state.generationHistory, ...historyResults],
@@ -965,12 +572,12 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               isLoadingMore: false,
             }
           }), false, 'loadHistoryWithPagination');
-          
+
           // 异步加载反馈状态
           if (newBatches.length > 0) {
             get().loadFeedbackStates().catch(console.error);
           }
-          
+
         } catch (error) {
           console.error('❌ 分页加载历史记录失败:', error);
           set((state) => ({
@@ -993,13 +600,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         set({
           generationHistory: [],
           generationBatches: [],
-          pagination: {
-            currentPage: 1,
-            totalPages: 1,
-            total: 0,
-            hasMore: false,
-            isLoadingMore: false,
-          }
+          pagination: initialPagination
         }, false, 'resetPagination');
       },
     }),

@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
 import { PromptAssistant } from './PromptAssistant';
+import { TagSelectorGroup } from './TagSelectorGroup';
+import { SubjectSuggestionsPanel } from './SubjectSuggestionsPanel';
+import { SceneTemplatesPanel } from './SceneTemplatesPanel';
 import type { GenerationConfig } from '../../../types';
 import {
   ART_STYLE_TAGS,
@@ -933,197 +936,84 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
 
       {/* 主题建议面板 */}
       {showSuggestions && (
-        <div className="p-4 bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200">
-          <h4 className="font-medium text-gray-800 mb-3">💡 主题建议</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {SUBJECT_SUGGESTIONS.map((subject, index) => (
-              <button
-                key={index}
-                onClick={() => addSubjectSuggestion(subject)}
-                className="text-left p-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                {subject}
-              </button>
-            ))}
-          </div>
-        </div>
+        <SubjectSuggestionsPanel
+          suggestions={SUBJECT_SUGGESTIONS}
+          onSelect={addSubjectSuggestion}
+        />
       )}
 
       {/* 场景模板面板 */}
       {showTemplates && (
-        <div className="p-4 bg-violet-50/70 backdrop-blur-sm rounded-xl border border-violet-200">
-          <h4 className="font-medium text-gray-800 mb-3">📸 专业场景模板</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {SCENE_TEMPLATES.map((template, index) => (
-              <div
-                key={index}
-                onClick={() => applySceneTemplate(template)}
-                className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                  selectedTemplate === template.label
-                    ? 'border-violet-500 bg-violet-100'
-                    : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50'
-                }`}
-              >
-                <div className="font-medium text-gray-800 mb-1">{template.label}</div>
-                <div className="text-xs text-gray-600 mb-2">{template.prompt}</div>
-                <div className="text-xs text-violet-600">
-                  {template.technical} • {template.lighting}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SceneTemplatesPanel
+          templates={SCENE_TEMPLATES}
+          selectedTemplate={selectedTemplate}
+          onSelect={applySceneTemplate}
+        />
       )}
 
-      {/* 艺术风格组（单选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🎨 艺术风格 <span className="text-xs text-gray-500">(单选)</span></h4>
-          {selectedArtStyle && (
-            <span className="text-xs text-blue-600">已选择</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {ART_STYLE_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => selectArtStyle(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedArtStyle === tag.value
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 标签选择器组 */}
+      <TagSelectorGroup
+        title="艺术风格"
+        icon="🎨"
+        tags={ART_STYLE_TAGS}
+        selectedValue={selectedArtStyle}
+        onSelect={selectArtStyle}
+        compact={compact}
+        colorScheme="blue"
+      />
 
-      {/* 主题风格组（单选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🏛️ 主题风格 <span className="text-xs text-gray-500">(单选)</span></h4>
-          {selectedThemeStyle && (
-            <span className="text-xs text-purple-600">已选择</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {THEME_STYLE_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => selectThemeStyle(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedThemeStyle === tag.value
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagSelectorGroup
+        title="主题风格"
+        icon="🏛️"
+        tags={THEME_STYLE_TAGS}
+        selectedValue={selectedThemeStyle}
+        onSelect={selectThemeStyle}
+        compact={compact}
+        colorScheme="purple"
+      />
 
-      {/* 情绪氛围组（单选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>😊 情绪氛围 <span className="text-xs text-gray-500">(单选)</span></h4>
-          {selectedMood && (
-            <span className="text-xs text-orange-600">已选择</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {MOOD_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => selectMood(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedMood === tag.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagSelectorGroup
+        title="情绪氛围"
+        icon="😊"
+        tags={MOOD_TAGS}
+        selectedValue={selectedMood}
+        onSelect={selectMood}
+        compact={compact}
+        colorScheme="orange"
+      />
 
-      {/* 效果增强组（可多选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>✨ 效果增强 <span className="text-xs text-gray-500">(可多选)</span></h4>
-          {selectedEnhancements.length > 0 && (
-            <span className="text-xs text-indigo-600">已选择 {selectedEnhancements.length} 个</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {ENHANCEMENT_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => toggleEnhancement(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedEnhancements.includes(tag.value)
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagSelectorGroup
+        title="效果增强"
+        icon="✨"
+        tags={ENHANCEMENT_TAGS}
+        selectedValue={selectedEnhancements}
+        onSelect={toggleEnhancement}
+        isMultiple
+        compact={compact}
+        colorScheme="indigo"
+      />
 
-      {/* 技术参数组（可多选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>📷 技术参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
-          {selectedTechnical.length > 0 && (
-            <span className="text-xs text-blue-600">已选择 {selectedTechnical.length} 个</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {TECHNICAL_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => toggleTechnical(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedTechnical.includes(tag.value)
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagSelectorGroup
+        title="技术参数"
+        icon="📷"
+        tags={TECHNICAL_TAGS}
+        selectedValue={selectedTechnical}
+        onSelect={toggleTechnical}
+        isMultiple
+        compact={compact}
+        colorScheme="blue"
+      />
 
-      {/* 构图参数组（可多选） */}
-      <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center justify-between">
-          <h4 className={`font-medium text-gray-800 ${compact ? "text-sm" : ""}`}>🖼️ 构图参数 <span className="text-xs text-gray-500">(可多选)</span></h4>
-          {selectedComposition.length > 0 && (
-            <span className="text-xs text-teal-600">已选择 {selectedComposition.length} 个</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {COMPOSITION_TAGS.map((tag, index) => (
-            <button
-              key={index}
-              onClick={() => toggleComposition(tag.value)}
-              className={`${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} rounded-lg transition-colors ${
-                selectedComposition.includes(tag.value)
-                  ? 'bg-teal-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tag.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagSelectorGroup
+        title="构图参数"
+        icon="🖼️"
+        tags={COMPOSITION_TAGS}
+        selectedValue={selectedComposition}
+        onSelect={toggleComposition}
+        isMultiple
+        compact={compact}
+        colorScheme="teal"
+      />
 
       {/* 高级选项组已移除 - 负面提示词功能已删除，现代AI模型不需要负面提示词 */}
 
