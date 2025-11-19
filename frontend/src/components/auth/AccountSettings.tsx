@@ -24,6 +24,7 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
   const [authAccounts, setAuthAccounts] = useState<AuthAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isBinding, setIsBinding] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 加载已绑定的账号
@@ -104,6 +105,44 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
     } catch (err) {
       console.error('解绑账号失败:', err);
       setError('解绑账号失败');
+    }
+  };
+
+  // 更新显示邮箱
+  const handleEmailSelect = async (emailOption: 'github' | 'google' | 'all') => {
+    if (!appUser) return;
+
+    const oauthAccounts = authAccounts.filter(acc => acc.provider !== 'device');
+    let newEmail = '';
+
+    if (emailOption === 'all') {
+      // 显示所有邮箱
+      const emails = oauthAccounts
+        .map(acc => acc.provider_email)
+        .filter(Boolean);
+      newEmail = emails.join(' / ');
+    } else {
+      // 显示选中账号的邮箱
+      const account = oauthAccounts.find(acc => acc.provider === emailOption);
+      newEmail = account?.provider_email || '';
+    }
+
+    if (!newEmail) {
+      setError('选中的账号没有邮箱');
+      return;
+    }
+
+    try {
+      setIsUpdatingEmail(true);
+      setError(null);
+      const userRepo = UserRepository.getInstance();
+      await userRepo.updateDisplayEmail(appUser.id, newEmail);
+      await refreshUser();
+    } catch (err) {
+      console.error('更新邮箱失败:', err);
+      setError('更新邮箱失败');
+    } finally {
+      setIsUpdatingEmail(false);
     }
   };
 
@@ -202,6 +241,41 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
               </div>
             </div>
           </div>
+
+          {/* 显示邮箱选择 - 只有多个绑定账号时显示 */}
+          {authAccounts.filter(acc => acc.provider !== 'device').length > 1 && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">显示邮箱</h4>
+              <p className="text-xs text-gray-500 mb-2">选择在个人资料中显示的邮箱</p>
+              <div className="flex flex-wrap gap-2">
+                {authAccounts.some(acc => acc.provider === 'github' && acc.provider_email) && (
+                  <button
+                    onClick={() => handleEmailSelect('github')}
+                    disabled={isUpdatingEmail}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    GitHub 邮箱
+                  </button>
+                )}
+                {authAccounts.some(acc => acc.provider === 'google' && acc.provider_email) && (
+                  <button
+                    onClick={() => handleEmailSelect('google')}
+                    disabled={isUpdatingEmail}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Google 邮箱
+                  </button>
+                )}
+                <button
+                  onClick={() => handleEmailSelect('all')}
+                  disabled={isUpdatingEmail}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  显示全部
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 错误提示 */}
           {error && (
