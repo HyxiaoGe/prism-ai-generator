@@ -5,15 +5,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { AccountSettings } from './AccountSettings';
 
 export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [showLoginOptions, setShowLoginOptions] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const {
     isAuthenticated,
     isLoading,
+    isLoggingOut,
     appUser,
     userType,
     loginWithGitHub,
@@ -196,13 +199,32 @@ export function UserMenu() {
           {/* 操作按钮 */}
           <div className="px-2 py-1">
             <button
-              onClick={handleLogout}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+              onClick={() => {
+                setShowAccountSettings(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors"
             >
-              退出登录
+              账号设置
+            </button>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className={`w-full px-3 py-2 text-left text-sm rounded transition-colors ${
+                isLoggingOut
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-red-600 hover:bg-red-50'
+              }`}
+            >
+              {isLoggingOut ? '退出中...' : '退出登录'}
             </button>
           </div>
         </div>
+      )}
+
+      {/* 账号设置模态框 */}
+      {showAccountSettings && (
+        <AccountSettings onClose={() => setShowAccountSettings(false)} />
       )}
     </div>
   );
