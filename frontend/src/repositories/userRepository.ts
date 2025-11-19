@@ -321,6 +321,14 @@ export class UserRepository extends BaseRepository {
   }
 
   /**
+   * 更新用户显示邮箱
+   * 可以设置为某个绑定账号的邮箱，或者多个邮箱组合
+   */
+  async updateDisplayEmail(userId: string, email: string): Promise<User> {
+    return this.update(userId, { email });
+  }
+
+  /**
    * 合并用户数据（将匿名用户数据合并到已登录用户）
    * 用于匿名用户登录后的数据迁移
    */
