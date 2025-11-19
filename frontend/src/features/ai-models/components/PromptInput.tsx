@@ -3,6 +3,19 @@ import { useAIGenerationStore } from '../../../store/aiGenerationStore';
 import { AIService } from '../services/aiService';
 import { PromptAssistant } from './PromptAssistant';
 import type { GenerationConfig } from '../../../types';
+import {
+  ART_STYLE_TAGS,
+  THEME_STYLE_TAGS,
+  MOOD_TAGS,
+  TECHNICAL_TAGS,
+  COMPOSITION_TAGS,
+  ENHANCEMENT_TAGS,
+  SCENE_TEMPLATES,
+  SUBJECT_SUGGESTIONS,
+  QUALITY_ENHANCEMENT,
+  ALL_TAG_GROUPS,
+  getDisplayValue,
+} from '../../../constants/tags';
 
 interface PromptInputProps {
   onGenerate?: (config: GenerationConfig) => void;
@@ -24,146 +37,6 @@ interface ParsedPromptResult {
   qualityEnhanced: boolean;
   fullOptimizedPrompt?: string; // 🔥 新增：保留完整的优化提示词
 }
-
-// 艺术风格组（单选 - 避免风格冲突）- 扩充版
-const ART_STYLE_TAGS = [
-  { label: '摄影级逼真', value: 'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed', displayValue: '摄影级逼真效果' },
-  { label: '电影级画质', value: 'cinematic photography, film photography, dramatic lighting, cinematic composition', displayValue: '电影级摄影画质' },
-  { label: '油画风格', value: 'oil painting, classical art, brush strokes, Renaissance style', displayValue: '经典油画风格' },
-  { label: '水彩画', value: 'watercolor painting, soft brushes, artistic, flowing colors', displayValue: '柔美水彩画风' },
-  { label: '动漫风格', value: 'anime style, manga, japanese animation, cel shading', displayValue: '日式动漫风格' },
-  { label: '像素艺术', value: 'pixel art, 8-bit, retro gaming style, pixelated', displayValue: '复古像素艺术' },
-  { label: '素描风格', value: 'pencil sketch, black and white, hand drawn, charcoal drawing', displayValue: '手绘素描风格' },
-  { label: '概念艺术', value: 'concept art, digital painting, matte painting, professional illustration', displayValue: '游戏概念艺术' },
-  { label: '3D渲染', value: '3D render, CGI, ray tracing, volumetric lighting, subsurface scattering', displayValue: '3D渲染技术' },
-  { label: '印象派', value: 'impressionist style, soft focus, painterly, artistic brushwork', displayValue: '印象派艺术风格' },
-];
-
-// 主题风格组（单选 - 避免主题冲突）- 扩充版
-const THEME_STYLE_TAGS = [
-  { label: '赛博朋克', value: 'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets', displayValue: '赛博朋克未来都市' },
-  { label: '科幻场景', value: 'sci-fi, futuristic, space technology, holographic displays, advanced technology', displayValue: '科幻未来场景' },
-  { label: '奇幻风格', value: 'fantasy, magical, mythical creatures, enchanted forest, mystical atmosphere', displayValue: '奇幻魔法世界' },
-  { label: '蒸汽朋克', value: 'steampunk, vintage machinery, brass gears, Victorian era, industrial', displayValue: '蒸汽朋克机械风' },
-  { label: '中国风', value: 'chinese style, traditional, elegant, ink wash painting, oriental aesthetics', displayValue: '中国传统古风' },
-  { label: '现代简约', value: 'modern, minimalist, clean design, sleek, contemporary', displayValue: '现代简约设计' },
-  { label: '复古未来', value: 'retro-futurism, vintage sci-fi, 80s aesthetic, synthwave, vaporwave', displayValue: '复古未来主义' },
-  { label: '自然生态', value: 'biophilic design, organic forms, nature-inspired, eco-friendly, sustainable', displayValue: '自然生态风格' },
-  { label: '工业风格', value: 'industrial design, metallic textures, concrete, raw materials, urban decay', displayValue: '工业废土风格' },
-  { label: '哥特风格', value: 'gothic architecture, dark romantic, ornate details, mysterious atmosphere', displayValue: '哥特神秘风格' },
-];
-
-// 情绪氛围组（单选 - 避免情绪冲突）- 扩充版
-const MOOD_TAGS = [
-  { label: '温暖明亮', value: 'warm lighting, bright, cheerful, golden hour, soft sunlight', displayValue: '温暖明亮氛围' },
-  { label: '神秘暗黑', value: 'dark, mysterious, moody lighting, deep shadows, dramatic chiaroscuro', displayValue: '神秘暗黑氛围' },
-  { label: '梦幻唯美', value: 'dreamy, ethereal, soft, beautiful, pastel colors, fairy-tale like', displayValue: '梦幻唯美氛围' },
-  { label: '震撼史诗', value: 'epic, dramatic, cinematic, powerful, grand scale, awe-inspiring', displayValue: '震撼史诗氛围' },
-  { label: '宁静平和', value: 'peaceful, calm, serene, tranquil, meditation, zen atmosphere', displayValue: '宁静禅意氛围' },
-  { label: '活力动感', value: 'energetic, dynamic, vibrant, lively, high-energy, action-packed', displayValue: '活力动感氛围' },
-  { label: '忧郁沉思', value: 'melancholic, contemplative, nostalgic, bittersweet, introspective', displayValue: '忧郁沉思氛围' },
-  { label: '奢华高贵', value: 'luxurious, elegant, sophisticated, premium, high-end, glamorous', displayValue: '奢华高贵氛围' },
-  { label: '原始野性', value: 'wild, primal, untamed, rugged, natural, raw power', displayValue: '原始野性氛围' },
-  { label: '未来科技', value: 'futuristic, high-tech, digital, cyber, holographic, technological', displayValue: '未来科技氛围' },
-];
-
-// 技术参数组（新增 - 可多选）
-const TECHNICAL_TAGS = [
-  { label: '85mm镜头', value: '85mm lens, portrait lens, shallow depth of field', displayValue: '85mm人像镜头' },
-  { label: '广角镜头', value: 'wide-angle lens, 24mm, expansive view, environmental context', displayValue: '24mm广角镜头' },
-  { label: '微距摄影', value: 'macro photography, extreme close-up, intricate details, magnified', displayValue: '微距特写摄影' },
-  { label: '长焦镜头', value: 'telephoto lens, 200mm, compressed perspective, background blur', displayValue: '200mm长焦镜头' },
-  { label: '鱼眼效果', value: 'fisheye lens, distorted perspective, 180-degree view, curved edges', displayValue: '鱼眼广角效果' },
-  { label: '景深控制', value: 'shallow depth of field, f/1.4, bokeh effect, selective focus', displayValue: '浅景深虚化' },
-  { label: '全景深', value: 'deep focus, f/11, everything in focus, landscape photography', displayValue: '全景深清晰' },
-  { label: '黄金时刻', value: 'golden hour lighting, warm sunlight, magic hour, soft shadows', displayValue: '黄金时刻光线' },
-  { label: '蓝调时刻', value: 'blue hour, twilight, evening atmosphere, city lights', displayValue: '蓝调时刻光线' },
-  { label: '工作室灯光', value: 'studio lighting, softbox, professional lighting setup, controlled environment', displayValue: '专业工作室灯光' },
-];
-
-// 构图参数组（新增 - 可多选）  
-const COMPOSITION_TAGS = [
-  { label: '三分法则', value: 'rule of thirds, balanced composition, dynamic framing', displayValue: '三分法则构图' },
-  { label: '中心构图', value: 'centered composition, symmetrical, balanced, focal point', displayValue: '中心对称构图' },
-  { label: '低角度仰拍', value: 'low angle shot, worm eye view, heroic perspective, dramatic angle', displayValue: '低角度仰拍视角' },
-  { label: '高角度俯拍', value: 'high angle shot, bird eye view, overhead perspective, aerial view', displayValue: '高角度俯拍视角' },
-  { label: '特写镜头', value: 'close-up shot, intimate framing, detailed focus, emotional connection', displayValue: '特写镜头构图' },
-  { label: '全景镜头', value: 'wide shot, establishing shot, environmental context, full scene', displayValue: '全景镜头构图' },
-  { label: '肩部特写', value: 'medium shot, upper body, conversational framing, portrait style', displayValue: '肩部特写构图' },
-  { label: '极近特写', value: 'extreme close-up, macro detail, textural focus, intimate detail', displayValue: '极近特写构图' },
-  { label: '动态构图', value: 'dynamic composition, diagonal lines, movement, energy', displayValue: '动态运动构图' },
-  { label: '极简构图', value: 'minimalist composition, negative space, clean lines, simple elegance', displayValue: '极简留白构图' },
-];
-
-// 补充标签组（可多选 - 不冲突的增强属性）- 扩充版
-const ENHANCEMENT_TAGS = [
-  { label: '超高细节', value: 'highly detailed, intricate details, ultra-detailed textures, photorealistic details', displayValue: '超高细节刻画' },
-  { label: '电影感', value: 'cinematic composition, film photography, movie-like quality, Hollywood style', displayValue: '电影质感效果' },
-  { label: '专业摄影', value: 'professional photography, studio quality, commercial grade, award-winning', displayValue: '专业摄影品质' },
-  { label: '艺术大师', value: 'masterpiece, award winning, gallery quality, museum piece', displayValue: '艺术大师作品' },
-  { label: '体积光效', value: 'volumetric lighting, god rays, atmospheric lighting, light beams', displayValue: '体积光线效果' },
-  { label: '色彩分级', value: 'color grading, cinematic colors, film look, professional color correction', displayValue: '电影级色彩调色' },
-  { label: 'HDR效果', value: 'HDR photography, high dynamic range, enhanced contrast, vivid colors', displayValue: 'HDR高动态范围' },
-  { label: '胶片质感', value: 'film grain, analog photography, vintage film look, organic texture', displayValue: '胶片质感效果' },
-];
-
-// 负面提示词功能已移除 - 现代AI模型通过优化提示词自动避免不良输出
-
-// 场景预设模板（新增）
-const SCENE_TEMPLATES = [
-  { 
-    label: '人像摄影', 
-    prompt: '专业人像摄影',
-    technical: '85mm lens, shallow depth of field, f/1.8',
-    lighting: 'soft studio lighting, professional portrait setup',
-    mood: 'confident, professional atmosphere'
-  },
-  {
-    label: '风景摄影',
-    prompt: '壮丽自然风景',
-    technical: 'wide-angle lens, deep focus, f/11',
-    lighting: 'golden hour lighting, dramatic sky',
-    mood: 'majestic, awe-inspiring atmosphere'
-  },
-  {
-    label: '产品摄影',
-    prompt: '高端产品展示',
-    technical: 'macro lens, perfect focus, commercial quality',
-    lighting: 'studio lighting, gradient shadows, clean background',
-    mood: 'premium, elegant, minimalist'
-  },
-  {
-    label: '街头摄影',
-    prompt: '真实街头场景',
-    technical: '35mm lens, documentary style, candid moment',
-    lighting: 'natural lighting, urban environment',
-    mood: 'authentic, gritty, urban life'
-  },
-];
-
-// 主题建议
-const SUBJECT_SUGGESTIONS = [
-  '美丽的风景画',
-  '未来城市天际线',
-  '可爱的动物',
-  '科幻机器人',
-  '奇幻生物',
-  '抽象艺术',
-  '人物肖像',
-  '静物摄影',
-];
-
-// 质量增强词汇（作为独立属性）
-const QUALITY_ENHANCEMENT = 'high quality, detailed, masterpiece, best quality, 4k resolution';
-
-// 辅助函数：根据value查找对应的中文displayValue
-const getDisplayValue = (value: string, tagGroups: any[]): string => {
-  for (const group of tagGroups) {
-    const tag = group.find((tag: any) => tag.value === value);
-    if (tag) return tag.displayValue || tag.label;
-  }
-  return value; // 如果找不到，返回原值
-};
 
 export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', compact = false, suggestedTags, parsedFeatures }: PromptInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
