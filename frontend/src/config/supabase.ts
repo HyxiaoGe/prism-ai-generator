@@ -12,9 +12,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 创建Supabase客户端
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // 禁用自动刷新，因为我们使用匿名访问
-    autoRefreshToken: false,
-    persistSession: false,
+    // 启用自动刷新 token
+    autoRefreshToken: true,
+    // 持久化 session 到 localStorage
+    persistSession: true,
+    // 检测 URL 中的 session
+    detectSessionInUrl: true,
+    // 存储 key
+    storageKey: 'prism-ai-auth',
   },
   realtime: {
     // 禁用实时功能以节省资源

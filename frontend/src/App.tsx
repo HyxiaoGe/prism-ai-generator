@@ -9,6 +9,8 @@ import {
   ImageGrid,
 } from './features/ai-models';
 import { useAIGenerationStore } from './store/aiGenerationStore';
+import { useAuthStore } from './store/authStore';
+import { UserMenu } from './components/auth';
 import { initializeDebugTools } from './utils/debugDatabase';
 import type { GenerationResult } from './types';
 
@@ -34,10 +36,42 @@ function App() {
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
 
+  // 认证状态
+  const {
+    initialize: initializeAuth,
+    handleAuthCallback,
+    isLoading: authLoading
+  } = useAuthStore();
+
   // 初始化调试工具
   useEffect(() => {
     return initializeDebugTools();
   }, []);
+
+  // 初始化认证和处理 OAuth 回调
+  useEffect(() => {
+    const initAuth = async () => {
+      // 检查是否是 OAuth 回调
+      const isCallback = window.location.pathname === '/auth/callback';
+
+      if (isCallback) {
+        try {
+          console.log('🔐 处理 OAuth 回调...');
+          await handleAuthCallback();
+          // 回调处理完成后，重定向到首页
+          window.history.replaceState({}, '', '/');
+        } catch (error) {
+          console.error('OAuth 回调处理失败:', error);
+          window.history.replaceState({}, '', '/');
+        }
+      } else {
+        // 正常初始化认证状态
+        await initializeAuth();
+      }
+    };
+
+    initAuth();
+  }, [initializeAuth, handleAuthCallback]);
 
   // 初始化应用数据
   useEffect(() => {
@@ -45,8 +79,8 @@ function App() {
       try {
         // 更新使用统计
         await updateUsageStats();
-        
-        // 📄 使用分页方式加载历史记录（第一页）
+
+        // 使用分页方式加载历史记录（第一页）
         await loadHistoryWithPagination(1, true);
         
         console.log('✅ 应用数据初始化完成');
@@ -240,7 +274,8 @@ function App() {
                 </button>
               </div>
 
-
+              {/* 用户菜单 */}
+              <UserMenu />
             </div>
           </div>
         </div>
