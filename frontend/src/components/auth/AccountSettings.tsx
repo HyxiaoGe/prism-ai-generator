@@ -16,8 +16,8 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
   const {
     appUser,
     userType,
-    loginWithGitHub,
-    loginWithGoogle,
+    bindWithGitHub,
+    bindWithGoogle,
     refreshUser,
   } = useAuthStore();
 
@@ -59,8 +59,8 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
     try {
       setIsBinding(true);
       setError(null);
-      await loginWithGitHub();
-      // 登录后会重定向，不需要在这里处理
+      await bindWithGitHub();
+      // 绑定后会重定向，不需要在这里处理
     } catch (err) {
       console.error('绑定 GitHub 失败:', err);
       setError('绑定 GitHub 失败');
@@ -75,7 +75,8 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
     try {
       setIsBinding(true);
       setError(null);
-      await loginWithGoogle();
+      await bindWithGoogle();
+      // 绑定后会重定向，不需要在这里处理
     } catch (err) {
       console.error('绑定 Google 失败:', err);
       setError('绑定 Google 失败');

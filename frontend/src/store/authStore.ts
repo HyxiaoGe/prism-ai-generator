@@ -27,6 +27,8 @@ interface AuthState {
   initialize: () => Promise<void>;
   loginWithGitHub: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  bindWithGitHub: () => Promise<void>;
+  bindWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   handleAuthCallback: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -120,6 +122,39 @@ export const useAuthStore = create<AuthState>()(
           await authService.loginWithGoogle();
         } catch (error) {
           console.error('Google 登录失败:', error);
+          throw error;
+        }
+      },
+
+      // 绑定 GitHub 账号到当前用户
+      bindWithGitHub: async () => {
+        const { appUser } = get();
+        if (!appUser) {
+          throw new Error('当前用户不存在');
+        }
+
+        try {
+          const authService = AuthService.getInstance();
+          await authService.bindWithGitHub(appUser.id);
+          // 绑定后会重定向，不需要在这里更新状态
+        } catch (error) {
+          console.error('绑定 GitHub 失败:', error);
+          throw error;
+        }
+      },
+
+      // 绑定 Google 账号到当前用户
+      bindWithGoogle: async () => {
+        const { appUser } = get();
+        if (!appUser) {
+          throw new Error('当前用户不存在');
+        }
+
+        try {
+          const authService = AuthService.getInstance();
+          await authService.bindWithGoogle(appUser.id);
+        } catch (error) {
+          console.error('绑定 Google 失败:', error);
           throw error;
         }
       },

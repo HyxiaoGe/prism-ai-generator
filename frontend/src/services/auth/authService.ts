@@ -88,6 +88,56 @@ export class AuthService {
   }
 
   // ============================================
+  // 绑定方法（将新认证方式绑定到当前用户）
+  // ============================================
+
+  /**
+   * 绑定 GitHub 账号到当前用户
+   */
+  async bindWithGitHub(currentUserId: string, options?: LoginOptions): Promise<void> {
+    // 保存绑定信息，用于回调时识别这是绑定操作
+    localStorage.setItem('prism_bind_user_id', currentUserId);
+    localStorage.setItem('prism_bind_provider', 'github');
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: options?.redirectTo || `${window.location.origin}/auth/callback`,
+        scopes: options?.scopes || 'read:user user:email',
+      },
+    });
+
+    if (error) {
+      localStorage.removeItem('prism_bind_user_id');
+      localStorage.removeItem('prism_bind_provider');
+      throw new Error(`绑定 GitHub 失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 绑定 Google 账号到当前用户
+   */
+  async bindWithGoogle(currentUserId: string, options?: LoginOptions): Promise<void> {
+    // 保存绑定信息
+    localStorage.setItem('prism_bind_user_id', currentUserId);
+    localStorage.setItem('prism_bind_provider', 'google');
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: options?.redirectTo || `${window.location.origin}/auth/callback`,
+        scopes: options?.scopes || 'email profile',
+      },
+    });
+
+    if (error) {
+      localStorage.removeItem('prism_bind_user_id');
+      localStorage.removeItem('prism_bind_provider');
+      throw new Error(`绑定 Google 失败: ${error.message}`);
+    }
+  }
+
+  // ============================================
   // 登出方法
   // ============================================
 
@@ -178,6 +228,17 @@ export class AuthService {
     const providerId = supabaseUser.id;
     const email = supabaseUser.email;
 
+    // 检查是否是绑定操作
+    const bindUserId = localStorage.getItem('prism_bind_user_id');
+    const bindProvider = localStorage.getItem('prism_bind_provider');
+
+    if (bindUserId && bindProvider) {
+      // 这是绑定操作，将新认证方式绑定到指定用户
+      return this.handleBindCallback(supabaseUser, bindUserId);
+    }
+
+    // 以下是登录操作的逻辑
+
     // 1. 检查该 OAuth 提供商是否已有用户
     let appUser = await this.userRepository.findByAuthProvider(provider, providerId);
 
@@ -226,6 +287,70 @@ export class AuthService {
     await this.mergeAnonymousDataIfNeeded(appUser.id);
 
     return appUser;
+  }
+
+  /**
+   * 处理绑定回调
+   * 将新的认证方式绑定到指定用户
+   */
+  private async handleBindCallback(supabaseUser: SupabaseUser, targetUserId: string): Promise<AppUser | null> {
+    const provider = this.getProviderFromUser(supabaseUser);
+    const providerId = supabaseUser.id;
+    const email = supabaseUser.email;
+    const metadata = supabaseUser.user_metadata || {};
+
+    try {
+      // 检查该认证方式是否已被其他用户使用
+      const existingUser = await this.userRepository.findByAuthProvider(provider, providerId);
+      if (existingUser && existingUser.id !== targetUserId) {
+        console.error(`❌ 该 ${provider} 账号已绑定到其他用户`);
+        // 清除绑定标识
+        localStorage.removeItem('prism_bind_user_id');
+        localStorage.removeItem('prism_bind_provider');
+        // 返回目标用户（不进行绑定）
+        return await this.userRepository.findById(targetUserId);
+      }
+
+      // 如果已经绑定到当前用户，直接返回
+      if (existingUser && existingUser.id === targetUserId) {
+        console.log(`✅ ${provider} 账号已绑定到当前用户`);
+        localStorage.removeItem('prism_bind_user_id');
+        localStorage.removeItem('prism_bind_provider');
+        return existingUser;
+      }
+
+      // 绑定新的认证方式
+      console.log(`🔗 绑定: 将 ${provider} 账号绑定到用户 ${targetUserId}`);
+      await this.userRepository.linkAuthAccount(
+        targetUserId,
+        provider,
+        providerId,
+        {
+          providerEmail: email || undefined,
+          providerData: metadata,
+        }
+      );
+
+      // 如果用户配额较低，升级配额
+      const targetUser = await this.userRepository.findById(targetUserId);
+      if (targetUser && targetUser.daily_quota < 50 && (provider === 'github' || provider === 'google')) {
+        await this.userRepository.upgradeUserQuota(targetUserId, provider);
+      }
+
+      // 清除绑定标识
+      localStorage.removeItem('prism_bind_user_id');
+      localStorage.removeItem('prism_bind_provider');
+
+      // 返回更新后的用户
+      return await this.userRepository.findById(targetUserId);
+    } catch (error) {
+      console.error('绑定账号失败:', error);
+      // 清除绑定标识
+      localStorage.removeItem('prism_bind_user_id');
+      localStorage.removeItem('prism_bind_provider');
+      // 返回目标用户
+      return await this.userRepository.findById(targetUserId);
+    }
   }
 
   /**
