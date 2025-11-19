@@ -218,9 +218,18 @@ export function UserMenu() {
                   {displayName}
                 </p>
                 {appUser?.email && (
-                  <p className="text-xs text-gray-500 truncate">
-                    {appUser.email}
-                  </p>
+                  <div className="text-xs text-gray-500">
+                    {/* 如果包含多个邮箱（用 / 分隔），则换行显示 */}
+                    {appUser.email.includes(' / ') ? (
+                      appUser.email.split(' / ').map((email, index) => (
+                        <p key={index} className="truncate">
+                          {email}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="truncate">{appUser.email}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
