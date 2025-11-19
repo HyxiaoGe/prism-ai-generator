@@ -78,6 +78,27 @@ export class UserRepository extends BaseRepository {
   }
 
   /**
+   * 根据邮箱获取用户
+   * 用于账号关联（同一邮箱的不同 OAuth 提供商）
+   */
+  async findByEmail(email: string): Promise<User | null> {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // 未找到
+      }
+      throw new Error(`按邮箱查询用户失败: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  /**
    * 获取用户的所有认证账号
    */
   async findAuthAccounts(userId: string): Promise<AuthAccount[]> {
