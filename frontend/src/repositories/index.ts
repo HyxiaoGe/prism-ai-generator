@@ -13,3 +13,4 @@ export { FeedbackRepository } from './feedbackRepository';
 export type { FeedbackInput } from './feedbackRepository';
 export { TranslationRepository } from './translationRepository';
 export { StatsRepository } from './statsRepository';
+export { ConfigRepository } from './configRepository';

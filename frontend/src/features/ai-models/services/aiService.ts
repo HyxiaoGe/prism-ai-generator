@@ -1,60 +1,52 @@
 import type { GenerationConfig, GenerationResult, AIModel } from '../types';
 import { AdapterManager } from './AdapterManager';
+import { ConfigService } from '../../../services/business';
+import type { AIModelConfig } from '../../../types/database';
 
 export class AIService {
   private static adapterManager = AdapterManager.getInstance();
+  private static configService = ConfigService.getInstance();
+
+  /**
+   * 将数据库模型配置转换为 AIModel 格式
+   */
+  private static convertToAIModel(config: AIModelConfig): AIModel {
+    return {
+      id: config.id,
+      name: config.name,
+      description: config.description || '',
+      provider: config.provider as 'replicate' | 'huggingface' | 'openai',
+      isEnabled: config.is_enabled,
+      runsNumber: config.runs_number || '',
+      costPerGeneration: config.cost_per_generation,
+      tags: config.tags || [],
+      defaultConfig: {
+        numInferenceSteps: config.default_config?.numInferenceSteps,
+        aspectRatio: config.default_config?.aspectRatio as '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | undefined,
+        outputFormat: config.default_config?.outputFormat as 'webp' | 'jpg' | 'png' | undefined,
+        numOutputs: config.default_config?.numOutputs,
+      },
+      capabilities: {
+        supportsAspectRatio: config.capabilities?.supportsAspectRatio ?? false,
+        maxSteps: config.capabilities?.maxSteps ?? 50,
+        maxOutputs: config.capabilities?.maxOutputs ?? 4,
+        supportedFormats: (config.capabilities?.supportedFormats || ['webp', 'jpg', 'png']) as ('webp' | 'jpg' | 'png')[],
+      },
+    };
+  }
 
   /**
    * 获取可用的AI模型列表
    */
   static async getAvailableModels(): Promise<AIModel[]> {
-    // 返回硬编码的模型列表，实际项目中可以从API获取
-    return [
-      {
-        id: 'flux-schnell',
-        name: 'black-forest-labs',
-        description: '超快速生成，4步出图，适合快速迭代和预览',
-        provider: 'replicate',
-        isEnabled: true,
-        runsNumber: '392.8M',
-        costPerGeneration: 0.003,
-        tags: ['超快', '经济', '推荐'],
-        defaultConfig: {
-          numInferenceSteps: 4,
-          aspectRatio: '1:1',
-          outputFormat: 'webp',
-          numOutputs: 4,
-        },
-        capabilities: {
-          supportsAspectRatio: true,
-          maxSteps: 4,
-          maxOutputs: 4, // Flux Schnell支持最多4张图片
-          supportedFormats: ['webp', 'jpg', 'png'],
-        },
-      },
-      {
-        id: 'imagen-4-ultra',
-        name: 'Google',
-        description: '高质量生成，细节丰富，适合最终作品和专业用途',
-        provider: 'replicate',
-        isEnabled: true,
-        runsNumber: '677.9K',
-        costPerGeneration: 0.004,
-        tags: ['高质量', '专业'],
-        defaultConfig: {
-          numInferenceSteps: 28,
-          aspectRatio: '16:9',
-          outputFormat: 'jpg',
-          numOutputs: 1,
-        },
-        capabilities: {
-          supportsAspectRatio: true,
-          maxSteps: 50,
-          maxOutputs: 1, // Google Imagen模型只能生成1张图片
-          supportedFormats: ['jpg', 'png'],
-        },
-      },
-    ];
+    try {
+      const modelConfigs = await this.configService.getAIModels();
+      return modelConfigs.map(config => this.convertToAIModel(config));
+    } catch (error) {
+      console.error('❌ 获取模型列表失败:', error);
+      // 返回空数组而不是抛出错误，让 fallback 机制在 configService 中处理
+      return [];
+    }
   }
 
   /**
@@ -65,14 +57,14 @@ export class AIService {
       // 获取指定模型
       const models = await this.getAvailableModels();
       const model = models.find(m => m.id === config.model);
-      
+
       if (!model) {
         throw new Error(`模型 ${config.model} 不存在`);
       }
 
       // 创建适配器
       const adapter = await this.adapterManager.createAdapter(model);
-      
+
       // 使用适配器生成图像
       const results = await adapter.generateImage(config);
       return results;
@@ -91,7 +83,7 @@ export class AIService {
       // 获取指定模型
       const models = await this.getAvailableModels();
       const model = models.find(m => m.id === config.model);
-      
+
       if (!model) {
         return {
           isValid: false,
@@ -119,7 +111,7 @@ export class AIService {
       // 获取指定模型
       const models = await this.getAvailableModels();
       const model = models.find(m => m.id === config.model);
-      
+
       if (!model) {
         return 0;
       }
@@ -141,7 +133,7 @@ export class AIService {
     try {
       const models = await this.getAvailableModels();
       const model = models.find(m => m.id === modelId);
-      
+
       if (!model) {
         throw new Error(`模型 ${modelId} 不存在`);
       }
@@ -182,4 +174,11 @@ export class AIService {
   static getAdapterStatistics() {
     return this.adapterManager.getStatistics();
   }
-} 
+
+  /**
+   * 清除模型缓存（当数据库模型配置更新时调用）
+   */
+  static clearModelsCache(): void {
+    this.configService.clearAIModelsCache();
+  }
+}

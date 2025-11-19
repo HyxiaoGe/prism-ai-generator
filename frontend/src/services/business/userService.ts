@@ -5,7 +5,7 @@
 
 import { UserRepository } from '../../repositories';
 import { FeedbackRepository } from '../../repositories';
-import type { User, UserUsageStats } from '../../types/database';
+import type { User, UserUsageStats, AuthProvider } from '../../types/database';
 
 export class UserService {
   private static instance: UserService;
@@ -31,6 +31,7 @@ export class UserService {
 
   /**
    * 获取或创建用户（带缓存）
+   * 默认使用设备指纹认证
    */
   async getOrCreateUser(): Promise<User> {
     const now = Date.now();
@@ -44,7 +45,7 @@ export class UserService {
     console.log('🔄 缓存过期或不存在，从数据库获取用户信息');
     const fingerprint = await this.userRepository.getCurrentFingerprint();
 
-    // 查找现有用户
+    // 查找现有用户（通过设备指纹）
     let user = await this.userRepository.findByFingerprint(fingerprint);
 
     if (user) {
@@ -57,8 +58,8 @@ export class UserService {
         console.log('✅ 现有用户信息已缓存');
       }
     } else {
-      // 创建新用户
-      user = await this.userRepository.create(fingerprint);
+      // 创建新用户（使用设备指纹作为认证方式）
+      user = await this.userRepository.create('device', fingerprint);
       console.log('✅ 新用户创建成功并已缓存');
     }
 
@@ -67,6 +68,78 @@ export class UserService {
     this.userCacheExpiry = now + this.USER_CACHE_DURATION;
 
     return user;
+  }
+
+  /**
+   * 通过 OAuth 获取或创建用户
+   */
+  async getOrCreateUserByOAuth(
+    provider: AuthProvider,
+    providerUserId: string,
+    options?: {
+      displayName?: string;
+      email?: string;
+      avatarUrl?: string;
+      providerEmail?: string;
+      providerData?: Record<string, any>;
+    }
+  ): Promise<User> {
+    // 查找现有用户
+    let user = await this.userRepository.findByAuthProvider(provider, providerUserId);
+
+    if (user) {
+      // 检查是否需要重置每日配额
+      const today = new Date().toISOString().split('T')[0];
+      if (user.last_reset_date !== today) {
+        user = await this.userRepository.resetDailyQuota(user.id);
+      }
+
+      // 更新用户信息（如果有新数据）
+      if (options?.displayName || options?.email || options?.avatarUrl) {
+        user = await this.userRepository.update(user.id, {
+          display_name: options.displayName || user.display_name,
+          email: options.email || user.email,
+          avatar_url: options.avatarUrl || user.avatar_url,
+        });
+      }
+    } else {
+      // 创建新用户
+      user = await this.userRepository.create(provider, providerUserId, options);
+    }
+
+    // 更新缓存
+    this.cachedUser = user;
+    this.userCacheExpiry = Date.now() + this.USER_CACHE_DURATION;
+
+    return user;
+  }
+
+  /**
+   * 绑定新的认证方式到当前用户
+   */
+  async linkAuthProvider(
+    provider: AuthProvider,
+    providerUserId: string,
+    options?: {
+      providerEmail?: string;
+      providerData?: Record<string, any>;
+    }
+  ): Promise<void> {
+    const user = await this.getOrCreateUser();
+    await this.userRepository.linkAuthAccount(user.id, provider, providerUserId, options);
+    console.log(`✅ 成功绑定 ${provider} 账号`);
+  }
+
+  /**
+   * 获取当前用户的所有认证方式
+   */
+  async getAuthAccounts(): Promise<Array<{ provider: AuthProvider; email?: string }>> {
+    const user = await this.getOrCreateUser();
+    const accounts = await this.userRepository.findAuthAccounts(user.id);
+    return accounts.map(a => ({
+      provider: a.provider,
+      email: a.provider_email || undefined,
+    }));
   }
 
   /**
@@ -143,7 +216,7 @@ export class UserService {
   /**
    * 清除用户缓存
    */
-  private clearUserCache(): void {
+  clearUserCache(): void {
     this.cachedUser = null;
     this.userCacheExpiry = 0;
   }
