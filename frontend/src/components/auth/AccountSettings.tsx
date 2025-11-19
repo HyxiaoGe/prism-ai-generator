@@ -258,7 +258,13 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
 
           {/* 绑定新账号 */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">绑定新账号</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">绑定新账号</h4>
+            {/* 警告提示 */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+              <p className="text-xs text-amber-700">
+                <strong>注意：</strong>绑定操作不可逆。绑定后无法解绑，只能换绑到其他同类型账号。如果目标账号已有独立用户，将自动合并数据。
+              </p>
+            </div>
             <div className="space-y-2">
               {/* GitHub */}
               <button

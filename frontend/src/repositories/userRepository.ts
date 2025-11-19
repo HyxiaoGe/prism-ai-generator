@@ -365,4 +365,61 @@ export class UserRepository extends BaseRepository {
       throw new Error(`删除源用户失败: ${deleteError.message}`);
     }
   }
+
+  /**
+   * 合并 OAuth 用户（将源用户的认证方式和数据迁移到目标用户）
+   * 用于绑定已有独立账号的场景
+   */
+  async mergeOAuthUsers(sourceUserId: string, targetUserId: string): Promise<void> {
+    // 1. 迁移 auth_accounts（除了 device 类型）
+    const { error: authError } = await this.supabase
+      .from('auth_accounts')
+      .update({ user_id: targetUserId })
+      .eq('user_id', sourceUserId)
+      .neq('provider', 'device');
+
+    if (authError) {
+      throw new Error(`迁移认证账号失败: ${authError.message}`);
+    }
+
+    // 2. 更新 generations 表的 user_id
+    const { error: genError } = await this.supabase
+      .from('generations')
+      .update({ user_id: targetUserId })
+      .eq('user_id', sourceUserId);
+
+    if (genError) {
+      throw new Error(`迁移生成记录失败: ${genError.message}`);
+    }
+
+    // 3. 更新 image_feedback 表的 user_id
+    const { error: feedbackError } = await this.supabase
+      .from('image_feedback')
+      .update({ user_id: targetUserId })
+      .eq('user_id', sourceUserId);
+
+    if (feedbackError) {
+      throw new Error(`迁移反馈记录失败: ${feedbackError.message}`);
+    }
+
+    // 4. 合并统计数据
+    const sourceUser = await this.findById(sourceUserId);
+    const targetUser = await this.findById(targetUserId);
+
+    if (sourceUser && targetUser) {
+      await this.update(targetUserId, {
+        total_generated: targetUser.total_generated + sourceUser.total_generated,
+      });
+    }
+
+    // 5. 删除源用户
+    const { error: deleteError } = await this.supabase
+      .from('users')
+      .delete()
+      .eq('id', sourceUserId);
+
+    if (deleteError) {
+      throw new Error(`删除源用户失败: ${deleteError.message}`);
+    }
+  }
 }

@@ -292,6 +292,7 @@ export class AuthService {
   /**
    * 处理绑定回调
    * 将新的认证方式绑定到指定用户
+   * 如果该认证方式已有独立账号，则自动合并
    */
   private async handleBindCallback(supabaseUser: SupabaseUser, targetUserId: string): Promise<AppUser | null> {
     const provider = this.getProviderFromUser(supabaseUser);
@@ -302,12 +303,21 @@ export class AuthService {
     try {
       // 检查该认证方式是否已被其他用户使用
       const existingUser = await this.userRepository.findByAuthProvider(provider, providerId);
+
       if (existingUser && existingUser.id !== targetUserId) {
-        console.error(`❌ 该 ${provider} 账号已绑定到其他用户`);
+        // 该 OAuth 账号已有独立用户，执行合并操作
+        console.log(`🔀 合并账号: 将 ${provider} 用户 (${existingUser.id}) 合并到当前用户 (${targetUserId})`);
+
+        // 合并用户数据和认证信息
+        await this.userRepository.mergeOAuthUsers(existingUser.id, targetUserId);
+
+        console.log(`✅ 账号合并完成`);
+
         // 清除绑定标识
         localStorage.removeItem('prism_bind_user_id');
         localStorage.removeItem('prism_bind_provider');
-        // 返回目标用户（不进行绑定）
+
+        // 返回更新后的目标用户
         return await this.userRepository.findById(targetUserId);
       }
 
@@ -319,7 +329,7 @@ export class AuthService {
         return existingUser;
       }
 
-      // 绑定新的认证方式
+      // 绑定新的认证方式（该 OAuth 之前从未使用过）
       console.log(`🔗 绑定: 将 ${provider} 账号绑定到用户 ${targetUserId}`);
       await this.userRepository.linkAuthAccount(
         targetUserId,
