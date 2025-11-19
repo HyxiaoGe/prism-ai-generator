@@ -111,6 +111,9 @@ export class UserRepository extends BaseRepository {
       providerData?: Record<string, any>;
     }
   ): Promise<User> {
+    // 根据认证提供商设置每日配额
+    const dailyQuota = this.getQuotaByProvider(provider);
+
     // 1. 创建 users 记录
     const { data: user, error: userError } = await this.supabase
       .from('users')
@@ -118,7 +121,7 @@ export class UserRepository extends BaseRepository {
         display_name: options?.displayName || null,
         email: options?.email || null,
         avatar_url: options?.avatarUrl || null,
-        daily_quota: 10,
+        daily_quota: dailyQuota,
         used_today: 0,
         last_reset_date: new Date().toISOString().split('T')[0],
         total_generated: 0,
@@ -256,6 +259,29 @@ export class UserRepository extends BaseRepository {
    */
   async getCurrentFingerprint(): Promise<string> {
     return this.deviceFingerprint.generateFingerprint();
+  }
+
+  /**
+   * 根据认证提供商获取每日配额
+   */
+  private getQuotaByProvider(provider: AuthProvider): number {
+    switch (provider) {
+      case 'github':
+        return 50;
+      case 'google':
+        return 50;
+      case 'device':
+      default:
+        return 10;
+    }
+  }
+
+  /**
+   * 升级用户配额（当匿名用户登录后）
+   */
+  async upgradeUserQuota(userId: string, provider: AuthProvider): Promise<User> {
+    const newQuota = this.getQuotaByProvider(provider);
+    return this.update(userId, { daily_quota: newQuota });
   }
 
   /**
