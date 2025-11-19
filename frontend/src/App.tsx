@@ -40,7 +40,8 @@ function App() {
   const {
     initialize: initializeAuth,
     handleAuthCallback,
-    isLoading: authLoading
+    isLoading: authLoading,
+    appUser
   } = useAuthStore();
 
   // 初始化调试工具
@@ -73,8 +74,13 @@ function App() {
     initAuth();
   }, [initializeAuth, handleAuthCallback]);
 
-  // 初始化应用数据
+  // 初始化应用数据 - 在用户信息加载完成后执行
   useEffect(() => {
+    // 等待认证完成且有用户信息后才加载数据
+    if (authLoading || !appUser) {
+      return;
+    }
+
     const initializeApp = async () => {
       try {
         // 更新使用统计
@@ -82,7 +88,7 @@ function App() {
 
         // 使用分页方式加载历史记录（第一页）
         await loadHistoryWithPagination(1, true);
-        
+
         console.log('✅ 应用数据初始化完成');
       } catch (error) {
         console.error('❌ 应用数据初始化失败:', error);
@@ -91,7 +97,8 @@ function App() {
     };
 
     initializeApp();
-  }, [updateUsageStats, loadHistoryWithPagination]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, appUser?.id]); // 只在认证状态变化或用户变化时重新加载
 
   // 监听生成状态变化，自动管理视图模式
   useEffect(() => {
@@ -244,11 +251,13 @@ function App() {
 
             {/* 右侧工具栏 */}
             <div className="flex items-center space-x-3">
-              {/* 用量显示 */}
-              {usageStats && (
+              {/* 用量显示 - 使用 appUser 数据保持与 UserMenu 一致 */}
+              {appUser && (
                 <div className="hidden lg:flex items-center space-x-2 text-sm bg-gray-100 px-3 py-2 rounded-xl">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">{usageStats.daily.remaining}/{usageStats.daily.limit}</span>
+                  <div className={`w-2 h-2 rounded-full ${
+                    (appUser.daily_quota - appUser.used_today) > 0 ? 'bg-green-500' : 'bg-red-500'
+                  }`}></div>
+                  <span className="text-gray-600">{appUser.daily_quota - appUser.used_today}/{appUser.daily_quota}</span>
                 </div>
               )}
               
