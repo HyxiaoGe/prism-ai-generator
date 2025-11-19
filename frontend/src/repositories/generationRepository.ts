@@ -80,7 +80,7 @@ export class GenerationRepository extends BaseRepository {
       .select(`
         id, user_id, prompt, model_name, model_cost, image_urls,
         status, created_at, is_public, original_image_urls,
-        r2_keys, r2_data, tags_used
+        r2_keys, r2_data, tags_used, view_count, like_count, share_count, is_featured
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -124,7 +124,7 @@ export class GenerationRepository extends BaseRepository {
       .select(`
         id, user_id, prompt, model_name, model_cost, image_urls,
         status, created_at, is_public, original_image_urls,
-        r2_keys, r2_data, tags_used
+        r2_keys, r2_data, tags_used, view_count, like_count, share_count, is_featured
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -151,7 +151,8 @@ export class GenerationRepository extends BaseRepository {
       .from('generations')
       .select(`
         id, prompt, model_name, image_urls, status, created_at,
-        is_public, original_image_urls, r2_keys, r2_data, tags_used
+        is_public, original_image_urls, r2_keys, r2_data, tags_used,
+        view_count, like_count, share_count, is_featured
       `)
       .eq('is_public', true)
       .eq('status', 'completed')
@@ -167,6 +168,10 @@ export class GenerationRepository extends BaseRepository {
       ...record,
       user_id: 'anonymous',
       model_cost: 0,
+      view_count: record.view_count || 0,
+      like_count: record.like_count || 0,
+      share_count: record.share_count || 0,
+      is_featured: record.is_featured || false,
     }));
   }
 
@@ -200,7 +205,8 @@ export class GenerationRepository extends BaseRepository {
       .from('generations')
       .select(`
         id, prompt, model_name, image_urls, status, created_at,
-        is_public, original_image_urls, r2_keys, r2_data, tags_used
+        is_public, original_image_urls, r2_keys, r2_data, tags_used,
+        view_count, like_count, share_count, is_featured
       `)
       .eq('is_public', true)
       .eq('status', 'completed')
@@ -211,11 +217,15 @@ export class GenerationRepository extends BaseRepository {
       throw new Error(`获取分页公开记录失败: ${error.message}`);
     }
 
-    // 为公开记录添加匿名 user_id 和默认 model_cost
+    // 为公开记录添加匿名 user_id 和默认值
     const mappedData = (data || []).map((record: any) => ({
       ...record,
       user_id: 'anonymous',
       model_cost: 0,
+      view_count: record.view_count || 0,
+      like_count: record.like_count || 0,
+      share_count: record.share_count || 0,
+      is_featured: record.is_featured || false,
     }));
 
     return {
