@@ -17,6 +17,7 @@ interface AuthState {
   // 状态
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLoggingOut: boolean;
   supabaseUser: SupabaseUser | null;
   appUser: AppUser | null;
   session: Session | null;
@@ -38,6 +39,7 @@ export const useAuthStore = create<AuthState>()(
       // 初始状态
       isAuthenticated: false,
       isLoading: true,
+      isLoggingOut: false,
       supabaseUser: null,
       appUser: null,
       session: null,
@@ -122,26 +124,35 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 登出
+      // 登出（乐观更新）
       logout: async () => {
+        // 1. 立即更新 UI - 乐观更新
+        set({
+          isLoggingOut: true,
+          isAuthenticated: false,
+          supabaseUser: null,
+          session: null,
+          userType: 'anonymous',
+        }, false, 'logout:optimistic');
+
         try {
           const authService = AuthService.getInstance();
+
+          // 2. 异步调用登出 API
           await authService.logout();
 
-          // 获取匿名用户
+          // 3. 异步获取匿名用户（不阻塞 UI）
           const anonymousUser = await authService.getOrCreateAnonymousUser();
 
           set({
-            isAuthenticated: false,
-            supabaseUser: null,
             appUser: anonymousUser,
-            session: null,
-            userType: 'anonymous',
-          }, false, 'logout');
+            isLoggingOut: false,
+          }, false, 'logout:complete');
 
         } catch (error) {
           console.error('登出失败:', error);
-          throw error;
+          // 即使出错也完成登出状态
+          set({ isLoggingOut: false }, false, 'logout:error');
         }
       },
 

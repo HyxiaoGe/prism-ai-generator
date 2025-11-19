@@ -218,6 +218,21 @@ export class UserRepository extends BaseRepository {
     return data;
   }
 
+  /**
+   * 解绑认证账号
+   * 用于用户手动解除绑定
+   */
+  async unlinkAuthAccount(accountId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('auth_accounts')
+      .delete()
+      .eq('id', accountId);
+
+    if (error) {
+      throw new Error(`解绑认证账号失败: ${error.message}`);
+    }
+  }
+
   // ============================================
   // 用户更新方法
   // ============================================
