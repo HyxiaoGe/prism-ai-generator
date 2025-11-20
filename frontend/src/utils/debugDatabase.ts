@@ -4,6 +4,7 @@
  */
 
 import { DatabaseService } from '../services/database';
+import { DeviceFingerprint } from '../repositories/baseRepository';
 
 // 扩展 Window 类型以支持调试方法
 declare global {
@@ -15,8 +16,73 @@ declare global {
     simulateTagUsage: () => Promise<void>;
     updateTagNames: () => Promise<void>;
     testFeedback: () => Promise<void>;
+    showDeviceFingerprint: () => Promise<void>;
+    debugUserAccounts: () => Promise<void>;
   }
 }
+
+/**
+ * 显示当前设备指纹信息
+ */
+const showDeviceFingerprint = async () => {
+  console.log('🔍 ==========设备指纹信息==========');
+
+  const deviceFingerprint = DeviceFingerprint.getInstance();
+  const fingerprint = await deviceFingerprint.generateFingerprint();
+
+  console.log('📱 当前设备指纹:', fingerprint);
+  console.log('\n📊 指纹生成因素:');
+  console.log('  - User Agent:', navigator.userAgent);
+  console.log('  - Language:', navigator.language);
+  console.log('  - Platform:', navigator.platform);
+  console.log('  - Screen:', screen.width + 'x' + screen.height);
+  console.log('  - Color Depth:', screen.colorDepth);
+  console.log('  - Timezone Offset:', new Date().getTimezoneOffset());
+  console.log('  - Hardware Concurrency:', navigator.hardwareConcurrency || 0);
+  console.log('  - Device Memory:', ('deviceMemory' in navigator ? (navigator as any).deviceMemory : 0) || 0);
+
+  console.log('\n⚠️  注意：IP地址不在指纹因素中，IP变化不会导致指纹变化');
+  console.log('✅ 指纹已缓存在内存中，刷新页面会重新计算');
+  console.log('=====================================');
+};
+
+/**
+ * 调试用户账号信息
+ */
+const debugUserAccounts = async () => {
+  console.log('👥 ==========用户账号调试==========');
+
+  const dbService = DatabaseService.getInstance();
+
+  // 获取当前用户
+  const { AuthService } = await import('../services/auth/authService');
+  const authService = AuthService.getInstance();
+  const currentUser = await authService.getAppUser();
+
+  console.log('👤 当前登录用户:');
+  if (currentUser) {
+    console.log('  - ID:', currentUser.id);
+    console.log('  - 显示名称:', currentUser.display_name);
+    console.log('  - 邮箱:', currentUser.email);
+    console.log('  - 今日配额:', currentUser.daily_quota);
+    console.log('  - 今日已用:', currentUser.used_today);
+    console.log('  - 总生成数:', currentUser.total_generated);
+  } else {
+    console.log('  - 未获取到用户信息');
+  }
+
+  // 获取设备指纹
+  const deviceFingerprint = DeviceFingerprint.getInstance();
+  const fingerprint = await deviceFingerprint.generateFingerprint();
+  console.log('\n📱 当前设备指纹:', fingerprint);
+
+  // 查询所有device类型的用户
+  console.log('\n🔍 查询数据库中所有device类型账号...');
+  console.log('（需要手动执行SQL查询）');
+  console.log('SQL: SELECT * FROM users WHERE id IN (SELECT user_id FROM auth_accounts WHERE provider = \'device\')');
+
+  console.log('=====================================');
+};
 
 /**
  * 查看今日生成记录
@@ -227,10 +293,14 @@ export function initializeDebugTools(): () => void {
   window.simulateTagUsage = simulateTagUsage;
   window.updateTagNames = updateTagNames;
   window.testFeedback = testFeedback;
+  window.showDeviceFingerprint = showDeviceFingerprint;
+  window.debugUserAccounts = debugUserAccounts;
 
   console.log('🔧 调试方法已挂载:');
   console.log('- debugDatabase() - 查看今日生成记录');
   console.log('- cleanupDatabase() - 清理重复的每日统计记录');
+  console.log('- showDeviceFingerprint() - 查看当前设备指纹');
+  console.log('- debugUserAccounts() - 调试用户账号信息');
   console.log('- debugTags() - 查看标签统计和趋势');
   console.log('- debugFeedback() - 查看用户反馈统计');
   console.log('- simulateTagUsage() - 模拟标签使用（测试功能）');
