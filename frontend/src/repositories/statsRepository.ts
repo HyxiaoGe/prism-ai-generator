@@ -131,24 +131,40 @@ export class StatsRepository extends BaseRepository {
    * 更新或创建提示词统计
    */
   async upsertPromptStats(promptText: string): Promise<void> {
-    const currentTime = new Date().toISOString();
+    try {
+      // 先查询是否已存在该提示词
+      const { data: existingStats, error: queryError } = await this.supabase
+        .from('prompt_stats')
+        .select('id, usage_count')
+        .eq('prompt_text', promptText)
+        .maybeSingle();
 
-    const { error } = await this.supabase
-      .from('prompt_stats')
-      .upsert({
-        prompt_text: promptText,
-        usage_count: 1,
-        last_used: currentTime,
-        average_rating: 0,
-      }, {
-        onConflict: 'prompt_text',
-        ignoreDuplicates: true,
-      });
+      if (queryError) {
+        console.warn('查询提示词统计失败:', queryError.message);
+        return;
+      }
 
-    if (error) {
-      console.error('提示词统计 upsert 失败:', error);
-      // 降级处理：直接插入
-      await this.insertPromptStats(promptText);
+      const currentTime = new Date().toISOString();
+
+      if (existingStats) {
+        // 已存在，更新统计
+        const { error: updateError } = await this.supabase
+          .from('prompt_stats')
+          .update({
+            usage_count: existingStats.usage_count + 1,
+            last_used: currentTime,
+          })
+          .eq('id', existingStats.id);
+
+        if (updateError) {
+          console.warn('更新提示词统计失败:', updateError.message);
+        }
+      } else {
+        // 不存在，插入新记录
+        await this.insertPromptStats(promptText);
+      }
+    } catch (error: any) {
+      console.warn('提示词统计更新异常:', error.message);
     }
   }
 
