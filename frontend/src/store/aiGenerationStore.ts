@@ -128,12 +128,25 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             updateProgress(100, 'processing');
             
             // 记录使用量
+            console.log('🔄 开始记录使用量...');
             await usageTracker.recordUsage();
-            
+            console.log('✅ 使用量记录成功');
+
+            // 刷新用户信息（确保配额显示更新）
+            console.log('🔄 刷新用户信息...');
+            try {
+              const { useAuthStore } = await import('./authStore');
+              await useAuthStore.getState().refreshUser();
+              console.log('✅ 用户信息已刷新');
+            } catch (refreshError) {
+              console.error('⚠️ 刷新用户信息失败:', refreshError);
+            }
+
             // 更新使用统计
             const newStats = await usageTracker.getUsageStats();
+            console.log('📊 最新使用统计:', newStats);
             set((state) => ({ ...state, usageStats: newStats }), false, 'updateUsageStats');
-            
+
             // 短暂延迟让用户看到100%进度
             setTimeout(() => {
               get().completeGeneration(results);
@@ -183,8 +196,13 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         // 异步保存到数据库（不阻塞UI）
         const saveToDatabase = async () => {
           try {
+            console.log('💾 开始保存生成记录到数据库...');
+            console.log('📝 提示词:', prompt);
+            console.log('🖼️ 图片数量:', results.length);
+
             // 上传图片到R2存储
             const uploadedResults = await uploadImagesToR2(results, prompt, batchId);
+            console.log('✅ R2上传完成，uploadedResults:', uploadedResults.length);
 
             // 更新状态中的批次数据
             if (uploadedResults !== results) {
@@ -199,8 +217,10 @@ export const useAIGenerationStore = create<AIGenerationState>()(
 
             // 提取标签数据
             const tagsUsed = extractTagsFromConfig(state.currentConfig);
+            console.log('🏷️ 提取标签:', tagsUsed.length, '个');
 
             // 保存到数据库
+            console.log('💾 调用 saveGenerationToDatabase...');
             const savedGeneration = await saveGenerationToDatabase(
               prompt,
               state.currentConfig,
@@ -208,8 +228,10 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               tagsUsed
             );
 
-            // 更新批次和结果的真实 generation_id
             if (savedGeneration && savedGeneration.id) {
+              console.log('✅ 数据库保存成功！Generation ID:', savedGeneration.id);
+
+              // 更新批次和结果的真实 generation_id
               set((state) => ({
                 generationBatches: state.generationBatches.map(batch =>
                   batch.id === batchId ? {
@@ -232,9 +254,15 @@ export const useAIGenerationStore = create<AIGenerationState>()(
                   } : historyItem
                 )
               }), false, 'updateRealGenerationId');
+
+              console.log('✅ 批次状态已更新');
+            } else {
+              console.warn('⚠️ 保存返回的 generation 为空或没有 ID');
             }
           } catch (dbError) {
             console.error('❌ 保存生成记录失败:', dbError);
+            console.error('❌ 错误详情:', dbError instanceof Error ? dbError.message : String(dbError));
+            console.error('❌ 错误堆栈:', dbError instanceof Error ? dbError.stack : '无堆栈信息');
           }
         };
 
