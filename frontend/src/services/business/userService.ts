@@ -156,13 +156,6 @@ export class UserService {
       throw new Error('无法获取用户信息');
     }
 
-    console.log('📊 [getUserUsageStats] 获取用户统计:', {
-      id: user.id,
-      displayName: user.display_name,
-      used_today: user.used_today,
-      daily_quota: user.daily_quota
-    });
-
     // 获取反馈统计
     const feedbacks = await this.feedbackRepository.findByUserId(user.id);
 
@@ -221,23 +214,10 @@ export class UserService {
       throw new Error('用户不存在');
     }
 
-    console.log('🔄 [recordUsage] 记录使用量到用户:', {
-      id: user.id,
-      displayName: user.display_name,
-      email: user.email,
-      currentUsed: user.used_today,
-      currentTotal: user.total_generated
-    });
-
     await this.userRepository.incrementUsage(user.id, user.used_today, user.total_generated);
 
     // 清除用户缓存
     this.clearUserCache();
-    console.log('✅ [recordUsage] 用户使用量已更新:', {
-      userId: user.id,
-      newUsed: user.used_today + 1,
-      newTotal: user.total_generated + 1
-    });
   }
 
   /**
