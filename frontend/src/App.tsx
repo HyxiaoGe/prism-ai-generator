@@ -35,6 +35,7 @@ function App() {
   const [searchPrompt, setSearchPrompt] = useState('');
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
+  const [galleryLoaded, setGalleryLoaded] = useState(false); // 标记画廊数据是否已加载
 
   // 认证状态
   const {
@@ -74,31 +75,47 @@ function App() {
     initAuth();
   }, [initializeAuth, handleAuthCallback]);
 
-  // 初始化应用数据 - 在用户信息加载完成后执行
+  // 初始化应用数据 - 只更新使用统计，画廊数据懒加载
   useEffect(() => {
-    // 等待认证完成且有用户信息后才加载数据
+    // 等待认证完成且有用户信息后才更新统计
     if (authLoading || !appUser) {
       return;
     }
 
     const initializeApp = async () => {
       try {
-        // 更新使用统计
+        // 只更新使用统计
         await updateUsageStats();
-
-        // 使用分页方式加载历史记录（第一页）
-        await loadHistoryWithPagination(1, true);
-
-        console.log('✅ 应用数据初始化完成');
+        console.log('✅ 使用统计更新完成');
       } catch (error) {
-        console.error('❌ 应用数据初始化失败:', error);
-        // 不阻塞应用启动，只记录错误
+        console.error('❌ 使用统计更新失败:', error);
       }
     };
 
     initializeApp();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, appUser?.id]); // 只在认证状态变化或用户变化时重新加载
+  }, [authLoading, appUser?.id]);
+
+  // 懒加载画廊数据 - 只有切换到画廊视图时才加载
+  useEffect(() => {
+    // 只有在画廊视图且未加载过数据时才加载
+    if (viewMode !== 'gallery' || galleryLoaded || authLoading || !appUser) {
+      return;
+    }
+
+    const loadGalleryData = async () => {
+      try {
+        await loadHistoryWithPagination(1, true);
+        setGalleryLoaded(true);
+        console.log('✅ 画廊数据加载完成');
+      } catch (error) {
+        console.error('❌ 画廊数据加载失败:', error);
+      }
+    };
+
+    loadGalleryData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, galleryLoaded, authLoading, appUser?.id]);
 
   // 监听生成状态变化，自动管理视图模式
   useEffect(() => {
@@ -111,6 +128,8 @@ function App() {
       setViewMode('gallery');
       setSidebarPrompt('');
       setSuggestedTags(null);
+      // 重置画廊加载状态，强制刷新数据（因为有新生成的图片）
+      setGalleryLoaded(false);
     } else if (currentGeneration.stage === 'error') {
       // 生成失败时回到首页
       setViewMode('home');
@@ -180,24 +199,6 @@ function App() {
 
   // 检查是否有内容（使用generationBatches）
   const hasContent = generationBatches.length > 0;
-
-  // 加载中状态
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center animate-fade-in">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
-            <Zap className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">正在加载中...</h2>
-          <p className="text-gray-600">正在从数据库加载您的作品画廊</p>
-          <div className="mt-4 w-32 h-1 bg-gray-200 rounded-full mx-auto overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -425,11 +426,13 @@ function App() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">我的作品画廊</h2>
-                <p className="text-gray-600 mt-1">
-                  共 {pagination.total} 个作品批次 | 已加载 {generationBatches.length} 个批次 (每页10个)，{generationHistory.length} 张图片
-                </p>
+                {!isLoading && (
+                  <p className="text-gray-600 mt-1">
+                    共 {pagination.total} 个作品批次 | 已加载 {generationBatches.length} 个批次 (每页10个)，{generationHistory.length} 张图片
+                  </p>
+                )}
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleNavigationChange('home')}
@@ -441,7 +444,19 @@ function App() {
               </div>
             </div>
 
-            {generationBatches.length > 0 ? (
+            {/* 画廊加载状态 */}
+            {isLoading ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
+                  <Zap className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">正在加载中...</h3>
+                <p className="text-gray-600">正在从数据库加载您的作品画廊</p>
+                <div className="mt-4 w-32 h-1 bg-gray-200 rounded-full mx-auto overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            ) : generationBatches.length > 0 ? (
               <>
                 <ImageGrid viewMode="masonry" onRegenerate={handleRegenerate} />
                 
