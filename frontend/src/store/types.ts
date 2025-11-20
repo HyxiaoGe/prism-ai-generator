@@ -62,6 +62,7 @@ export interface AIGenerationState {
   completeGeneration: (results: GenerationResult[]) => void;
   failGeneration: (error: string) => void;
   cancelGeneration: () => void;
+  resetGeneration: () => void;
   clearHistory: () => void;
   removeFromHistory: (id: string) => void;
   removeBatch: (batchId: string) => void;
