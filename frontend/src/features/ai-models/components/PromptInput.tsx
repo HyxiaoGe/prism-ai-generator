@@ -762,6 +762,22 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
+      {/* AI提示词状态指示器 */}
+      {fullOptimizedPrompt && (
+        <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-purple-700">✨ 使用AI优化提示词</span>
+          </div>
+          <button
+            onClick={() => setFullOptimizedPrompt(null)}
+            className="px-3 py-1 text-xs bg-white hover:bg-gray-50 text-gray-600 rounded-lg transition-colors border border-gray-300"
+          >
+            切换回原始
+          </button>
+        </div>
+      )}
+
       {/* 主输入框 */}
       <div className="relative">
         <textarea
@@ -773,7 +789,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
           className="w-full min-h-[100px] max-h-[200px] p-4 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
           disabled={disabled}
         />
-        
+
         {/* 字符计数 */}
         <div className="absolute bottom-2 right-2 text-xs text-gray-500">
           {prompt.length}/1000

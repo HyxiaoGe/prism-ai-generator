@@ -569,21 +569,40 @@ function App() {
 
             {/* 生成完成预览 */}
             {currentGeneration.stage === 'completed' && !currentGeneration.isGenerating && (
-              <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col items-center justify-center p-8">
-                <div className="text-center space-y-6">
+              <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col p-6 overflow-y-auto">
+                <div className="space-y-6">
                   {/* 成功图标动画 */}
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto animate-bounce-once">
-                    <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto animate-bounce-once mb-3">
+                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">✨ 生成完成！</h3>
+                    <p className="text-sm text-gray-600">共生成 {generationBatches[0]?.results?.length || 0} 张图片</p>
                   </div>
 
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">✨ 生成完成！</h3>
-                    <p className="text-gray-600">您的AI作品已经创作完成</p>
-                  </div>
+                  {/* 图片缩略图预览 */}
+                  {generationBatches.length > 0 && generationBatches[0].results && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {generationBatches[0].results.slice(0, 4).map((result, index) => (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-200 hover:border-purple-400 transition-all duration-300 group">
+                          <img
+                            src={result.url}
+                            alt={`生成的图片 ${index + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
+                            <span className="text-white text-xs font-medium">图片 {index + 1}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                  <div className="flex space-x-4">
+                  {/* 操作按钮 */}
+                  <div className="flex flex-col space-y-3">
                     <button
                       onClick={() => {
                         setViewMode('gallery');
@@ -591,16 +610,16 @@ function App() {
                         setSidebarPrompt('');
                         setSuggestedTags(null);
                       }}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
                     >
-                      查看作品
+                      查看完整作品
                     </button>
                     <button
                       onClick={() => {
                         // 重置生成状态，允许继续创作
                         useAIGenerationStore.getState().resetGeneration();
                       }}
-                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
+                      className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
                     >
                       继续创作
                     </button>
@@ -610,52 +629,177 @@ function App() {
             )}
 
             {/* 生成失败提示 */}
-            {currentGeneration.stage === 'error' && !currentGeneration.isGenerating && (
-              <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col items-center justify-center p-8">
-                <div className="text-center space-y-6 max-w-md">
-                  {/* 错误图标 */}
-                  <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
+            {currentGeneration.stage === 'error' && !currentGeneration.isGenerating && (() => {
+              const errorMessage = currentGeneration.error || '发生了未知错误';
 
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">生成失败</h3>
-                    <p className="text-gray-600 mb-4">{currentGeneration.error || '发生了未知错误'}</p>
-                    <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg text-left">
-                      <p className="font-medium mb-2">💡 可能的原因：</p>
-                      <ul className="space-y-1 list-disc list-inside">
-                        <li>网络连接不稳定</li>
-                        <li>提示词包含敏感内容</li>
-                        <li>服务器繁忙，请稍后重试</li>
+              // 智能错误分析
+              const getErrorInfo = () => {
+                const lowerError = errorMessage.toLowerCase();
+
+                // 网络错误
+                if (lowerError.includes('network') || lowerError.includes('timeout') || lowerError.includes('fetch')) {
+                  return {
+                    icon: '🌐',
+                    title: '网络连接问题',
+                    reasons: [
+                      '网络连接不稳定或超时',
+                      'VPN或代理服务可能影响连接',
+                      '防火墙阻止了请求'
+                    ],
+                    solutions: [
+                      '检查网络连接状态',
+                      '尝试关闭VPN后重试',
+                      '等待几分钟后再次尝试'
+                    ]
+                  };
+                }
+
+                // 配额/限制错误
+                if (lowerError.includes('quota') || lowerError.includes('limit') || lowerError.includes('达上限')) {
+                  return {
+                    icon: '⚠️',
+                    title: '使用配额限制',
+                    reasons: [
+                      '今日生成次数已用完',
+                      '账户配额不足',
+                      '服务器限流保护'
+                    ],
+                    solutions: [
+                      '等待明日凌晨配额重置',
+                      '查看账户配额情况',
+                      '联系客服升级配额'
+                    ]
+                  };
+                }
+
+                // 内容审核错误
+                if (lowerError.includes('content') || lowerError.includes('inappropriate') || lowerError.includes('敏感')) {
+                  return {
+                    icon: '🚫',
+                    title: '内容审核未通过',
+                    reasons: [
+                      '提示词包含敏感或违规内容',
+                      '图像主题不符合平台规范',
+                      '触发了安全过滤规则'
+                    ],
+                    solutions: [
+                      '修改提示词，避免敏感词汇',
+                      '使用更加明确和正面的描述',
+                      '参考平台内容规范'
+                    ]
+                  };
+                }
+
+                // 服务器错误
+                if (lowerError.includes('500') || lowerError.includes('503') || lowerError.includes('server')) {
+                  return {
+                    icon: '🔧',
+                    title: '服务器暂时不可用',
+                    reasons: [
+                      'AI服务器正在维护',
+                      '服务器负载过高',
+                      '后端服务临时故障'
+                    ],
+                    solutions: [
+                      '等待5-10分钟后重试',
+                      '选择非高峰时段使用',
+                      '关注平台公告了解维护信息'
+                    ]
+                  };
+                }
+
+                // 默认通用错误
+                return {
+                  icon: '❌',
+                  title: '生成失败',
+                  reasons: [
+                    '服务器繁忙，请稍后重试',
+                    '生成参数可能存在问题',
+                    '临时网络波动'
+                  ],
+                  solutions: [
+                    '稍后再次尝试',
+                    '检查提示词和参数设置',
+                    '联系客服获取帮助'
+                  ]
+                };
+              };
+
+              const errorInfo = getErrorInfo();
+
+              return (
+                <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col p-6 overflow-y-auto">
+                  <div className="space-y-6 max-w-md mx-auto w-full">
+                    {/* 错误图标 */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-4xl mb-3">
+                        {errorInfo.icon}
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">{errorInfo.title}</h3>
+                      <p className="text-sm text-gray-600 text-center px-4">{errorMessage}</p>
+                    </div>
+
+                    {/* 可能原因 */}
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="font-medium text-red-900 mb-2 flex items-center">
+                        <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        可能的原因
+                      </p>
+                      <ul className="space-y-1 text-sm text-red-800">
+                        {errorInfo.reasons.map((reason, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-2">•</span>
+                            <span>{reason}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
-                  </div>
 
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => {
-                        // 重置生成状态，保留设置
-                        useAIGenerationStore.getState().resetGeneration();
-                      }}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
-                    >
-                      重新生成
-                    </button>
-                    <button
-                      onClick={() => {
-                        useAIGenerationStore.getState().resetGeneration();
-                        setShowSettings(false);
-                      }}
-                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
-                    >
-                      关闭
-                    </button>
+                    {/* 解决方案 */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <p className="font-medium text-blue-900 mb-2 flex items-center">
+                        <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        解决方案
+                      </p>
+                      <ul className="space-y-1 text-sm text-blue-800">
+                        {errorInfo.solutions.map((solution, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-2">✓</span>
+                            <span>{solution}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="flex flex-col space-y-3">
+                      <button
+                        onClick={() => {
+                          // 重置生成状态，保留设置
+                          useAIGenerationStore.getState().resetGeneration();
+                        }}
+                        className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
+                      >
+                        重新生成
+                      </button>
+                      <button
+                        onClick={() => {
+                          useAIGenerationStore.getState().resetGeneration();
+                          setShowSettings(false);
+                        }}
+                        className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
+                      >
+                        关闭
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
