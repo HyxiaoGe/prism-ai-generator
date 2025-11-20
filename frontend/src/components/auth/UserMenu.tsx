@@ -18,6 +18,7 @@ export function UserMenu() {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [authAccounts, setAuthAccounts] = useState<AuthAccount[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const prevAvatarUrlRef = useRef<string | null>(null);
 
   const {
     isAuthenticated,
@@ -43,11 +44,54 @@ export function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 当 avatarUrl 变化时重置加载状态
+  // 优化头像加载：使用缓存避免重复加载
   const avatarUrl = appUser?.avatar_url;
   useEffect(() => {
-    setImageLoaded(false);
+    // 如果 URL 没有变化，不重置加载状态
+    if (avatarUrl === prevAvatarUrlRef.current) {
+      return;
+    }
+
+    prevAvatarUrlRef.current = avatarUrl;
+
+    // 如果没有头像 URL，直接返回
+    if (!avatarUrl) {
+      setImageLoaded(false);
+      return;
+    }
+
+    // 检查 sessionStorage 缓存，看是否已经加载过这个 URL
+    const cachedAvatars = sessionStorage.getItem('loadedAvatars');
+    const loadedUrls = cachedAvatars ? JSON.parse(cachedAvatars) : [];
+
+    if (loadedUrls.includes(avatarUrl)) {
+      // 已经加载过，直接显示
+      setImageLoaded(true);
+    } else {
+      // 需要重新加载
+      setImageLoaded(false);
+    }
   }, [avatarUrl]);
+
+  // 头像加载完成时缓存 URL
+  const handleAvatarLoad = () => {
+    setImageLoaded(true);
+
+    if (avatarUrl) {
+      // 缓存已加载的头像 URL
+      const cachedAvatars = sessionStorage.getItem('loadedAvatars');
+      const loadedUrls = cachedAvatars ? JSON.parse(cachedAvatars) : [];
+
+      if (!loadedUrls.includes(avatarUrl)) {
+        loadedUrls.push(avatarUrl);
+        // 只保留最近 10 个 URL
+        if (loadedUrls.length > 10) {
+          loadedUrls.shift();
+        }
+        sessionStorage.setItem('loadedAvatars', JSON.stringify(loadedUrls));
+      }
+    }
+  };
 
   // 加载已绑定的认证账号
   useEffect(() => {
@@ -186,7 +230,7 @@ export function UserMenu() {
               src={avatarUrl}
               alt={displayName}
               className={`w-8 h-8 rounded-full transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setImageLoaded(true)}
+              onLoad={handleAvatarLoad}
             />
           </div>
         ) : (
