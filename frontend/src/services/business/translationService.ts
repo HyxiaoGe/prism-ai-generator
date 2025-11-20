@@ -54,13 +54,24 @@ export class TranslationService {
   }): Promise<PromptTranslation | null> {
     const promptHash = this.generatePromptHash(translationData.originalPrompt.trim().toLowerCase());
 
+    // 确保 confidence 在 0-1 范围内（数据库字段是 numeric(3,2)，最大值 9.99）
+    let normalizedConfidence = translationData.confidence;
+    if (normalizedConfidence !== undefined) {
+      // 如果 confidence >= 1，说明是百分比形式（如 95），需要除以 100
+      if (normalizedConfidence >= 1) {
+        normalizedConfidence = normalizedConfidence / 100;
+      }
+      // 确保在有效范围内 [0, 1]
+      normalizedConfidence = Math.max(0, Math.min(1, normalizedConfidence));
+    }
+
     const result = await this.translationRepository.upsert({
       originalPrompt: translationData.originalPrompt,
       promptHash,
       translatedPrompt: translationData.translatedPrompt,
       explanation: translationData.explanation,
       keyTerms: translationData.keyTerms,
-      confidence: translationData.confidence,
+      confidence: normalizedConfidence,
     });
 
     if (result) {
