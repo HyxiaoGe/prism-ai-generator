@@ -117,8 +117,6 @@ export class GenerationService {
   } = {}): Promise<PaginationResult<Generation>> {
     const result = await this.generationRepository.findPublicWithPagination(params);
 
-    console.log(`📄 分页加载公开画廊: 第${result.currentPage}页, ${result.data.length}/${result.total}条记录`);
-
     return result;
   }
 
@@ -169,9 +167,7 @@ export class GenerationService {
    * 更新或创建提示词统计
    */
   async updatePromptStats(promptText: string): Promise<void> {
-    console.log('📊 优化提示词统计更新:', promptText.substring(0, 50) + '...');
     await this.statsRepository.upsertPromptStats(promptText);
-    console.log('✅ 提示词统计优化更新完成');
   }
 
   /**

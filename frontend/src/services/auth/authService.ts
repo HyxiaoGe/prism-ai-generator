@@ -254,8 +254,6 @@ export class AuthService {
 
       if (existingUserByEmail) {
         // 邮箱已存在，将新的认证方式绑定到现有用户
-        console.log(`🔗 邮箱关联: 将 ${provider} 账号绑定到现有用户 (${email})`);
-
         const metadata = supabaseUser.user_metadata || {};
         await this.userRepository.linkAuthAccount(
           existingUserByEmail.id,
@@ -306,12 +304,8 @@ export class AuthService {
 
       if (existingUser && existingUser.id !== targetUserId) {
         // 该 OAuth 账号已有独立用户，执行合并操作
-        console.log(`🔀 合并账号: 将 ${provider} 用户 (${existingUser.id}) 合并到当前用户 (${targetUserId})`);
-
         // 合并用户数据和认证信息
         await this.userRepository.mergeOAuthUsers(existingUser.id, targetUserId);
-
-        console.log(`✅ 账号合并完成`);
 
         // 清除绑定标识
         localStorage.removeItem('prism_bind_user_id');
@@ -323,14 +317,12 @@ export class AuthService {
 
       // 如果已经绑定到当前用户，直接返回
       if (existingUser && existingUser.id === targetUserId) {
-        console.log(`✅ ${provider} 账号已绑定到当前用户`);
         localStorage.removeItem('prism_bind_user_id');
         localStorage.removeItem('prism_bind_provider');
         return existingUser;
       }
 
       // 绑定新的认证方式（该 OAuth 之前从未使用过）
-      console.log(`🔗 绑定: 将 ${provider} 账号绑定到用户 ${targetUserId}`);
       await this.userRepository.linkAuthAccount(
         targetUserId,
         provider,
@@ -376,7 +368,6 @@ export class AuthService {
       // 检查匿名用户是否存在
       const anonymousUser = await this.userRepository.findById(anonymousUserId);
       if (anonymousUser && anonymousUser.id !== targetUserId) {
-        console.log('🔄 合并匿名用户数据:', anonymousUserId, '->', targetUserId);
         await this.userRepository.mergeUsers(anonymousUserId, targetUserId);
       }
     } catch (error) {

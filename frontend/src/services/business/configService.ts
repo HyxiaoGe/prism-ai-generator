@@ -64,7 +64,6 @@ export class ConfigService {
       if (tags.length > 0) {
         this.tagsCache = tags;
         this.tagsCacheExpiry = now + this.CACHE_DURATION;
-        console.log(`📦 从数据库加载了 ${tags.length} 个标签`);
         return tags;
       }
     } catch (error) {
@@ -145,7 +144,6 @@ export class ConfigService {
       if (templates.length > 0) {
         this.sceneTemplatesCache = templates;
         this.sceneTemplatesCacheExpiry = now + this.CACHE_DURATION;
-        console.log(`📦 从数据库加载了 ${templates.length} 个场景模板`);
         return templates;
       }
     } catch (error) {
@@ -195,7 +193,6 @@ export class ConfigService {
       if (models.length > 0) {
         this.aiModelsCache = models;
         this.aiModelsCacheExpiry = now + this.CACHE_DURATION;
-        console.log(`📦 从数据库加载了 ${models.length} 个 AI 模型`);
         return models;
       }
     } catch (error) {
@@ -286,7 +283,6 @@ export class ConfigService {
     this.sceneTemplatesCacheExpiry = 0;
     this.aiModelsCache = null;
     this.aiModelsCacheExpiry = 0;
-    console.log('🗑️ 配置缓存已清除');
   }
 
   /**

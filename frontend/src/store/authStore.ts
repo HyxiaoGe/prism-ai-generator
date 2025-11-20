@@ -80,8 +80,6 @@ export const useAuthStore = create<AuthState>()(
 
           // 设置认证状态变化监听
           authService.onAuthStateChange(async (event, session) => {
-            console.log('🔐 认证状态变化:', event);
-
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               await get().refreshUser();
             } else if (event === 'SIGNED_OUT') {

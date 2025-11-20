@@ -39,11 +39,9 @@ export class UserService {
 
     // 检查缓存是否有效
     if (this.cachedUser && now < this.userCacheExpiry) {
-      console.log('📈 使用缓存的用户信息，避免数据库查询');
       return this.cachedUser;
     }
 
-    console.log('🔄 缓存过期或不存在，从数据库获取用户信息');
     const fingerprint = await this.userRepository.getCurrentFingerprint();
 
     // 查找现有用户（通过设备指纹）
@@ -54,14 +52,10 @@ export class UserService {
       const today = new Date().toISOString().split('T')[0];
       if (user.last_reset_date !== today) {
         user = await this.userRepository.resetDailyQuota(user.id);
-        console.log('✅ 用户配额重置成功并已缓存');
-      } else {
-        console.log('✅ 现有用户信息已缓存');
       }
     } else {
       // 创建新用户（使用设备指纹作为认证方式）
       user = await this.userRepository.create('device', fingerprint);
-      console.log('✅ 新用户创建成功并已缓存');
     }
 
     // 更新缓存
