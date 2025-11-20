@@ -147,10 +147,12 @@ export function UserMenu() {
     }
   };
 
-  // 加载中
+  // 加载中 - 显示登录按钮骨架
   if (isLoading) {
     return (
-      <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+      <div className="px-4 py-2 bg-gray-200 rounded-lg animate-pulse">
+        <span className="text-transparent">登录</span>
+      </div>
     );
   }
 
