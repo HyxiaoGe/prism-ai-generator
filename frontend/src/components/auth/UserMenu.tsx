@@ -52,7 +52,7 @@ export function UserMenu() {
       return;
     }
 
-    prevAvatarUrlRef.current = avatarUrl;
+    prevAvatarUrlRef.current = avatarUrl || null;
 
     // 如果没有头像 URL，直接返回
     if (!avatarUrl) {
