@@ -9,3 +9,5 @@ export { TagService } from './tagService';
 export { FeedbackService } from './feedbackService';
 export { TranslationService } from './translationService';
 export { ConfigService } from './configService';
+export { SceneTemplateService } from './sceneTemplateService';
+export type { TemplateBrowseOptions, TemplateRecommendation } from './sceneTemplateService';

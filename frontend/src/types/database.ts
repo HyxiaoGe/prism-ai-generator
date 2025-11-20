@@ -62,18 +62,74 @@ export interface TagRecord {
   updated_at: string;
 }
 
-// 场景模板表
+// 模板难度等级
+export type TemplateDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
+// 模板状态
+export type TemplateStatus = 'active' | 'draft' | 'archived';
+
+// 场景模板表（数据库驱动版本）
 export interface SceneTemplate {
   id: string;
-  label: string;
-  prompt: string;
-  technical?: string;
-  lighting?: string;
-  mood?: string;
-  sort_order: number;
-  is_enabled: boolean;
+  name: string;                       // 模板名称
+  description?: string;               // 模板描述
+  category: string;                   // 主分类（如：portrait, landscape, product等）
+  subcategory?: string;               // 子分类
+  tags: string[];                     // 标签数组
+  difficulty: TemplateDifficulty;     // 难度等级
+  base_prompt: string;                // 基础提示词
+  suggested_tags?: {                  // 建议的标签配置
+    art_style?: string[];
+    theme_style?: string[];
+    mood?: string[];
+    technical?: string[];
+    composition?: string[];
+    enhancement?: string[];
+  };
+  thumbnail_url?: string;             // 缩略图URL
+  example_images: string[];           // 示例图片URL数组
+  usage_count: number;                // 使用次数
+  rating: number;                     // 平均评分（0-5）
+  likes_count: number;                // 点赞数
+  author_id?: string;                 // 创建者ID（关联users表）
+  is_official: boolean;               // 是否官方模板
+  is_public: boolean;                 // 是否公开
+  status: TemplateStatus;             // 状态
   created_at: string;
   updated_at: string;
+}
+
+// 用户模板收藏表
+export interface UserTemplateFavorite {
+  id: string;
+  user_id: string;                    // 用户ID
+  template_id: string;                // 模板ID
+  notes?: string;                     // 用户备注
+  created_at: string;
+}
+
+// 模板评分表
+export interface TemplateRating {
+  id: string;
+  template_id: string;                // 模板ID
+  user_id: string;                    // 用户ID
+  rating: number;                     // 评分（1-5）
+  review?: string;                    // 评价文字
+  helpful_count: number;              // 有用计数
+  created_at: string;
+  updated_at: string;
+}
+
+// 模板使用历史表
+export interface TemplateUsageHistory {
+  id: string;
+  template_id: string;                // 模板ID
+  user_id: string;                    // 用户ID
+  generation_id?: string;             // 关联的生成记录ID
+  custom_modifications?: string;      // 用户的自定义修改
+  was_successful: boolean;            // 生成是否成功
+  user_rating?: number;               // 用户对此次使用的评分
+  created_at: string;
 }
 
 // AI模型配置表
@@ -373,6 +429,21 @@ export interface Database {
         Row: SceneTemplate;
         Insert: Omit<SceneTemplate, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<SceneTemplate, 'id' | 'created_at'>>;
+      };
+      user_template_favorites: {
+        Row: UserTemplateFavorite;
+        Insert: Omit<UserTemplateFavorite, 'id' | 'created_at'>;
+        Update: Partial<Omit<UserTemplateFavorite, 'id' | 'created_at'>>;
+      };
+      template_ratings: {
+        Row: TemplateRating;
+        Insert: Omit<TemplateRating, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<TemplateRating, 'id' | 'created_at'>>;
+      };
+      template_usage_history: {
+        Row: TemplateUsageHistory;
+        Insert: Omit<TemplateUsageHistory, 'id' | 'created_at'>;
+        Update: Partial<Omit<TemplateUsageHistory, 'id' | 'created_at'>>;
       };
       ai_models: {
         Row: AIModelConfig;
