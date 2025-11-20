@@ -14,7 +14,10 @@ import { UserMenu } from './components/auth';
 import { ToastContainer } from './components/ui';
 import { useToast } from './hooks/useToast';
 import { initializeDebugTools } from './utils/debugDatabase';
+import { TemplateShowcase } from './components/home';
+import { SceneTemplateService } from './services/business';
 import type { GenerationResult } from './types';
+import type { SceneTemplate } from './types/database';
 
 function App() {
   const {
@@ -140,11 +143,28 @@ function App() {
     setShowSettings(true);
   };
 
-  // 处理模板点击
-  const handleTemplateClick = (template: any) => {
-    setSidebarPrompt(template.prompt); // 只填充右侧栏，不影响搜索框
-    setSuggestedTags(template.suggestedTags); // 设置推荐标签
-    setShowSettings(true); // 打开设置面板
+  // 处理模板点击（支持硬编码模板和数据库模板）
+  const handleTemplateClick = async (template: any | SceneTemplate) => {
+    // 判断是否为数据库模板（有id字段）
+    if ('id' in template && template.id) {
+      // 数据库模板
+      try {
+        const templateService = SceneTemplateService.getInstance();
+        const { basePrompt, suggestedTags } = await templateService.applyTemplate(template.id);
+
+        setSidebarPrompt(basePrompt);
+        setSuggestedTags(suggestedTags);
+        setShowSettings(true);
+      } catch (error) {
+        console.error('应用模板失败:', error);
+        toast.error('模板加载失败', '请重试或选择其他模板');
+      }
+    } else {
+      // 硬编码模板（向后兼容）
+      setSidebarPrompt(template.prompt);
+      setSuggestedTags(template.suggestedTags);
+      setShowSettings(true);
+    }
   };
 
   // 处理右下角+号点击
@@ -291,110 +311,49 @@ function App() {
         
         {/* 根据视图模式显示不同内容 */}
         {viewMode === 'home' && (
-          <div className="max-w-4xl mx-auto px-6 py-16 animate-fade-in">
-            <div className="text-center mb-12">
+          <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in">
+            {/* Hero区域 */}
+            <div className="text-center mb-16">
               <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center">
                 <Zap className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <h2 className="text-4xl font-bold text-gray-900 mb-4">
                 用AI创造无限可能
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                输入你的想法，我们的AI将为你生成令人惊艳的图像作品
+                从 25+ 专业模板中选择，或输入你的创意想法，让AI为你生成令人惊艳的图像作品
               </p>
             </div>
 
-            {/* 快速开始模板 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              {[
-                { 
-                  emoji: '🏔️', 
-                  title: '电影级风景', 
-                  desc: '专业摄影，震撼视觉', 
-                  prompt: '雄伟的雪山日出，天空云海翻腾，晨光洒向大地',
-                  suggestedTags: {
-                    artStyle: 'cinematic photography, film photography, dramatic lighting, cinematic composition',
-                    themeStyle: 'modern, minimalist, clean design, sleek, contemporary', 
-                    mood: 'epic, dramatic, cinematic, powerful, grand scale, awe-inspiring',
-                    technical: ['wide-angle lens, 24mm, expansive view, environmental context', 'golden hour lighting, warm sunlight, magic hour, soft shadows'],
-                    enhancements: ['cinematic composition, film photography, movie-like quality, Hollywood style', 'HDR photography, high dynamic range, enhanced contrast, vivid colors']
-                  }
-                },
-                { 
-                  emoji: '👩‍🎨', 
-                  title: '专业人像', 
-                  desc: '工作室级人像摄影', 
-                  prompt: '优雅女性艺术家肖像，柔和灯光下专注创作的神情',
-                  suggestedTags: {
-                    artStyle: 'photorealistic, hyperrealistic, professional photography, 8K ultra-detailed',
-                    themeStyle: 'modern, minimalist, clean design, sleek, contemporary',
-                    mood: 'luxurious, elegant, sophisticated, premium, high-end, glamorous', 
-                    technical: ['85mm lens, portrait lens, shallow depth of field', 'studio lighting, softbox, professional lighting setup, controlled environment'],
-                    enhancements: ['professional photography, studio quality, commercial grade, award-winning', 'highly detailed, intricate details, ultra-detailed textures, photorealistic details']
-                  }
-                },
-                { 
-                  emoji: '🌆', 
-                  title: '赛博朋克', 
-                  desc: '未来科技美学', 
-                  prompt: '霓虹灯闪烁的未来都市夜景，雨水倒映着彩色光芒',
-                  suggestedTags: {
-                    artStyle: '3D render, CGI, ray tracing, volumetric lighting, subsurface scattering',
-                    themeStyle: 'cyberpunk, neon lights, futuristic city, dystopian, rain-soaked streets',
-                    mood: 'futuristic, high-tech, digital, cyber, holographic, technological',
-                    technical: ['blue hour, twilight, evening atmosphere, city lights'],
-                    enhancements: ['volumetric lighting, god rays, atmospheric lighting, light beams', 'cinematic composition, film photography, movie-like quality, Hollywood style']
-                  }
-                },
-                { 
-                  emoji: '🎭', 
-                  title: '概念艺术', 
-                  desc: '游戏级概念设计', 
-                  prompt: '神秘的奇幻森林，古老的魔法光芒在林间穿梭',
-                  suggestedTags: {
-                    artStyle: 'concept art, digital painting, matte painting, professional illustration',
-                    themeStyle: 'fantasy, magical, mythical creatures, enchanted forest, mystical atmosphere',
-                    mood: 'dreamy, ethereal, soft, beautiful, pastel colors, fairy-tale like',
-                    technical: [],
-                    enhancements: ['highly detailed, intricate details, ultra-detailed textures, photorealistic details', 'masterpiece, award winning, gallery quality, museum piece']
-                  }
-                },
-              ].map((template, index) => (
-                <div
-                  key={index}
-                  onClick={() => handleTemplateClick(template)}
-                  className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 hover:border-purple-200 transform hover:scale-105 hover:-translate-y-1"
-                >
-                  <div className="text-center">
-                    <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                      {template.emoji}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {template.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      {template.desc}
+            {/* 新的模板展示组件 */}
+            <TemplateShowcase
+              onSelectTemplate={handleTemplateClick}
+              selectedTemplateId={undefined}
+            />
+
+            {/* 用户作品统计（如果有） */}
+            {hasContent && (
+              <div className="mt-16 text-center bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-8 border border-purple-100">
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                    <Image className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {generationBatches.length} 个作品批次
                     </p>
-                    <button className="w-full bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 py-2 px-4 rounded-lg transition-colors text-sm font-medium">
-                      点击体验 →
-                    </button>
+                    <p className="text-sm text-gray-600">
+                      您已经开始了AI创作之旅
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* 成功案例或其他内容 */}
-            {hasContent && (
-              <div className="text-center">
-                <p className="text-gray-600 mb-4">
-                  您已经创作了 {generationBatches.length} 个作品批次
-                </p>
                 <button
                   onClick={() => handleNavigationChange('gallery')}
-                  className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                  className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-xl shadow-lg font-medium"
                 >
                   <Image className="w-5 h-5" />
-                  <span>查看我的作品</span>
+                  <span>查看我的作品画廊</span>
+                  <span>→</span>
                 </button>
               </div>
             )}
