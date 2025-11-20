@@ -30,7 +30,8 @@ function App() {
     loadHistoryWithPagination,
     loadMoreHistory,
     resetPagination,
-    prepareRegeneration
+    prepareRegeneration,
+    resetGeneration
   } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
@@ -588,7 +589,7 @@ function App() {
                       {generationBatches[0].results.slice(0, 4).map((result, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-200 hover:border-purple-400 transition-all duration-300 group">
                           <img
-                            src={result.url}
+                            src={result.imageUrl}
                             alt={`生成的图片 ${index + 1}`}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             loading="lazy"
