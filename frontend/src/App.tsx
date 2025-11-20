@@ -11,24 +11,26 @@ import {
 import { useAIGenerationStore } from './store/aiGenerationStore';
 import { useAuthStore } from './store/authStore';
 import { UserMenu } from './components/auth';
+import { ToastContainer } from './components/ui';
+import { useToast } from './hooks/useToast';
 import { initializeDebugTools } from './utils/debugDatabase';
 import type { GenerationResult } from './types';
 
 function App() {
-  const { 
-    currentGeneration, 
-    generationHistory, 
-    generationBatches, 
-    usageStats, 
+  const {
+    currentGeneration,
+    generationHistory,
+    generationBatches,
+    usageStats,
     isLoading,
     currentConfig,
     pagination,
-    updateUsageStats, 
+    updateUsageStats,
     loadHistoryFromDatabase,
     loadHistoryWithPagination,
     loadMoreHistory,
     resetPagination,
-    prepareRegeneration 
+    prepareRegeneration
   } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
@@ -36,6 +38,9 @@ function App() {
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
   const [galleryLoaded, setGalleryLoaded] = useState(false); // 标记画廊数据是否已加载
+
+  // Toast 通知系统
+  const toast = useToast();
 
   // 认证状态
   const {
@@ -89,6 +94,7 @@ function App() {
         console.log('✅ 使用统计更新完成');
       } catch (error) {
         console.error('❌ 使用统计更新失败:', error);
+        toast.error('使用统计加载失败', '请刷新页面重试');
       }
     };
 
@@ -110,6 +116,7 @@ function App() {
         console.log('✅ 画廊数据加载完成');
       } catch (error) {
         console.error('❌ 画廊数据加载失败:', error);
+        toast.error('画廊加载失败', '请检查网络连接后重试');
       }
     };
 
@@ -177,23 +184,23 @@ function App() {
         createdAt: batch.createdAt,
         status: 'completed',
       };
-      
+
       // 准备重新生成配置
       await prepareRegeneration(result);
-      
+
       // 获取更新后的配置，使用解析出的基础提示词
       const { currentConfig: updatedConfig } = useAIGenerationStore.getState();
-      
+
       // 设置侧边栏提示词（使用解析出的基础描述，而不是完整的技术标签）
       setSidebarPrompt(updatedConfig.prompt || batch.prompt);
       setSuggestedTags(null); // 重新生成不使用推荐标签
-      
+
       // 打开设置面板
       setShowSettings(true);
-      
+
     } catch (error) {
       console.error('❌ 准备重新生成失败:', error);
-      alert('准备重新生成失败，请重试');
+      toast.error('准备重新生成失败', '请重试或联系客服');
     }
   };
 
@@ -571,6 +578,9 @@ function App() {
           <Plus className="w-6 h-6" />
         </button>
       )}
+
+      {/* Toast 通知容器 */}
+      <ToastContainer toasts={toast.toasts} onClose={toast.close} />
     </div>
   );
 }
