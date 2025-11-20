@@ -11,6 +11,7 @@ export class UserService {
   private static instance: UserService;
   private userRepository: UserRepository;
   private feedbackRepository: FeedbackRepository;
+  private authService: any; // 延迟导入避免循环依赖
 
   // 用户缓存
   private cachedUser: User | null = null;
@@ -146,7 +147,21 @@ export class UserService {
    * 获取用户使用统计
    */
   async getUserUsageStats(): Promise<UserUsageStats> {
-    const user = await this.getOrCreateUser();
+    // 使用 AuthService.getAppUser() 获取当前用户
+    const { AuthService } = await import('../auth/authService');
+    const authService = AuthService.getInstance();
+    const user = await authService.getAppUser();
+
+    if (!user) {
+      throw new Error('无法获取用户信息');
+    }
+
+    console.log('📊 [getUserUsageStats] 获取用户统计:', {
+      id: user.id,
+      displayName: user.display_name,
+      used_today: user.used_today,
+      daily_quota: user.daily_quota
+    });
 
     // 获取反馈统计
     const feedbacks = await this.feedbackRepository.findByUserId(user.id);
@@ -191,19 +206,38 @@ export class UserService {
    * 记录用户使用
    */
   async recordUsage(userId?: string): Promise<void> {
-    const user = userId
-      ? await this.userRepository.findById(userId)
-      : await this.getOrCreateUser();
+    let user: User | null;
+
+    if (userId) {
+      user = await this.userRepository.findById(userId);
+    } else {
+      // 使用 AuthService.getAppUser() 获取当前用户（已登录或匿名）
+      const { AuthService } = await import('../auth/authService');
+      const authService = AuthService.getInstance();
+      user = await authService.getAppUser();
+    }
 
     if (!user) {
       throw new Error('用户不存在');
     }
 
+    console.log('🔄 [recordUsage] 记录使用量到用户:', {
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email,
+      currentUsed: user.used_today,
+      currentTotal: user.total_generated
+    });
+
     await this.userRepository.incrementUsage(user.id, user.used_today, user.total_generated);
 
     // 清除用户缓存
     this.clearUserCache();
-    console.log('🔄 用户使用量已更新，缓存已清除');
+    console.log('✅ [recordUsage] 用户使用量已更新:', {
+      userId: user.id,
+      newUsed: user.used_today + 1,
+      newTotal: user.total_generated + 1
+    });
   }
 
   /**

@@ -4,7 +4,7 @@
  */
 
 import { GenerationRepository, StatsRepository, TagRepository } from '../../repositories';
-import { UserService } from './userService';
+import { AuthService } from '../auth/authService';
 import type { Generation, TagCategory } from '../../types/database';
 import type { PaginationResult } from '../../repositories';
 
@@ -13,13 +13,13 @@ export class GenerationService {
   private generationRepository: GenerationRepository;
   private statsRepository: StatsRepository;
   private tagRepository: TagRepository;
-  private userService: UserService;
+  private authService: AuthService;
 
   private constructor() {
     this.generationRepository = GenerationRepository.getInstance();
     this.statsRepository = StatsRepository.getInstance();
     this.tagRepository = TagRepository.getInstance();
-    this.userService = UserService.getInstance();
+    this.authService = AuthService.getInstance();
   }
 
   static getInstance(): GenerationService {
@@ -44,7 +44,18 @@ export class GenerationService {
     r2_keys?: string[];
     r2_data?: any;
   }): Promise<Generation> {
-    const user = await this.userService.getOrCreateUser();
+    // 使用 AuthService.getAppUser() 获取当前用户（已登录用户或匿名用户）
+    const user = await this.authService.getAppUser();
+
+    if (!user) {
+      throw new Error('无法获取用户信息');
+    }
+
+    console.log('💾 [saveGeneration] 使用用户:', {
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email
+    });
 
     const generation = await this.generationRepository.save({
       userId: user.id,
@@ -70,7 +81,10 @@ export class GenerationService {
    * 获取用户生成历史
    */
   async getUserGenerations(limit: number = 50): Promise<Generation[]> {
-    const user = await this.userService.getOrCreateUser();
+    const user = await this.authService.getAppUser();
+    if (!user) {
+      throw new Error('无法获取用户信息');
+    }
     return this.generationRepository.findByUserId(user.id, limit);
   }
 
@@ -82,7 +96,17 @@ export class GenerationService {
     offset?: number;
     page?: number;
   } = {}): Promise<PaginationResult<Generation>> {
-    const user = await this.userService.getOrCreateUser();
+    const user = await this.authService.getAppUser();
+    if (!user) {
+      throw new Error('无法获取用户信息');
+    }
+
+    console.log('📄 [getUserGenerationsWithPagination] 使用用户:', {
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email
+    });
+
     const result = await this.generationRepository.findByUserIdWithPagination(user.id, params);
 
     console.log(`📄 分页加载用户历史: 第${result.currentPage}页, ${result.data.length}/${result.total}条记录`);
