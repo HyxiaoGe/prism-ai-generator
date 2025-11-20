@@ -51,12 +51,6 @@ export class GenerationService {
       throw new Error('无法获取用户信息');
     }
 
-    console.log('💾 [saveGeneration] 使用用户:', {
-      id: user.id,
-      displayName: user.display_name,
-      email: user.email
-    });
-
     const generation = await this.generationRepository.save({
       userId: user.id,
       ...params,
@@ -101,15 +95,7 @@ export class GenerationService {
       throw new Error('无法获取用户信息');
     }
 
-    console.log('📄 [getUserGenerationsWithPagination] 使用用户:', {
-      id: user.id,
-      displayName: user.display_name,
-      email: user.email
-    });
-
     const result = await this.generationRepository.findByUserIdWithPagination(user.id, params);
-
-    console.log(`📄 分页加载用户历史: 第${result.currentPage}页, ${result.data.length}/${result.total}条记录`);
 
     return result;
   }

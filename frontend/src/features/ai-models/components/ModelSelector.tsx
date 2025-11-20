@@ -21,8 +21,13 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
   const [isLoading, setIsLoading] = useState(false);
 
 
-  // 初始化加载可用模型
+  // 初始化加载可用模型（只在组件挂载时执行一次）
   useEffect(() => {
+    // 如果已经有可用模型，不重复加载
+    if (availableModels.length > 0) {
+      return;
+    }
+
     const loadModels = async () => {
       setIsLoading(true);
       try {
@@ -33,7 +38,7 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
           runsNumber: model.runsNumber || model.id
         }));
         setAvailableModels(modelsWithRunsNumber);
-        
+
         // 如果没有选中模型，默认选择第一个可用模型
         if (!selectedModel && modelsWithRunsNumber.length > 0) {
           const defaultModel = modelsWithRunsNumber.find(m => m.id === 'flux-schnell') || modelsWithRunsNumber[0];
@@ -48,7 +53,8 @@ export function ModelSelector({ disabled = false, compact = false }: ModelSelect
     };
 
     loadModels();
-  }, [selectedModel, setSelectedModel, setAvailableModels, updateConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 只在组件挂载时执行一次
 
   // 处理模型选择
   const handleModelSelect = async (model: AIModel) => {

@@ -28,12 +28,9 @@ export class TranslationRepository extends BaseRepository {
       .from('prompt_translations')
       .select('*')
       .eq('original_prompt_hash', promptHash)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null;
-      }
       console.error('获取翻译缓存失败:', error);
       return null;
     }

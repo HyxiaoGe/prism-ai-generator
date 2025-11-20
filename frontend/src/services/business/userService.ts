@@ -156,13 +156,6 @@ export class UserService {
       throw new Error('无法获取用户信息');
     }
 
-    console.log('📊 [getUserUsageStats] 获取用户统计:', {
-      id: user.id,
-      displayName: user.display_name,
-      used_today: user.used_today,
-      daily_quota: user.daily_quota
-    });
-
     // 获取反馈统计
     const feedbacks = await this.feedbackRepository.findByUserId(user.id);
 
