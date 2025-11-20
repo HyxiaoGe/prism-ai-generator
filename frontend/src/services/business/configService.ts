@@ -160,15 +160,29 @@ export class ConfigService {
    * 将本地场景模板转换为数据库记录格式
    */
   private getLocalSceneTemplatesAsRecords(): SceneTemplate[] {
+    // 将旧格式转换为新格式
     return LOCAL_SCENE_TEMPLATES.map((template, index) => ({
       id: `local-template-${index}`,
-      label: template.label,
-      prompt: template.prompt,
-      technical: template.technical,
-      lighting: template.lighting,
-      mood: template.mood,
-      sort_order: index + 1,
-      is_enabled: true,
+      name: template.label,
+      description: template.prompt,
+      category: 'general',
+      subcategory: undefined,
+      tags: [],
+      difficulty: 'beginner' as const,
+      base_prompt: template.prompt,
+      suggested_tags: {
+        technical: template.technical ? [template.technical] : [],
+        mood: template.mood ? [template.mood] : [],
+      },
+      thumbnail_url: undefined,
+      example_images: [],
+      usage_count: 0,
+      rating: 0,
+      likes_count: 0,
+      author_id: undefined,
+      is_official: true,
+      is_public: true,
+      status: 'active' as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }));

@@ -14,3 +14,5 @@ export type { FeedbackInput } from './feedbackRepository';
 export { TranslationRepository } from './translationRepository';
 export { StatsRepository } from './statsRepository';
 export { ConfigRepository } from './configRepository';
+export { SceneTemplateRepository } from './sceneTemplateRepository';
+export type { TemplateFilter, TemplateSortBy } from './sceneTemplateRepository';

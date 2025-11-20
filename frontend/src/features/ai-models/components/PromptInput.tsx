@@ -5,8 +5,9 @@ import { AIService } from '../services/aiService';
 import { PromptAssistant } from './PromptAssistant';
 import { TagSelectorGroup } from './TagSelectorGroup';
 import { SubjectSuggestionsPanel } from './SubjectSuggestionsPanel';
-import { SceneTemplatesPanel } from './SceneTemplatesPanel';
+import { SceneTemplateBrowser } from './SceneTemplateBrowser';
 import type { GenerationConfig } from '../../../types';
+import type { SceneTemplate } from '../../../types/database';
 import {
   ART_STYLE_TAGS,
   THEME_STYLE_TAGS,
@@ -324,27 +325,46 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   };
 
   // 应用场景模板
-  const applySceneTemplate = (template: typeof SCENE_TEMPLATES[0]) => {
-    setPrompt(template.prompt);
-    setSelectedTemplate(template.label);
+  const applySceneTemplate = (template: SceneTemplate) => {
+    // 设置基础提示词
+    setPrompt(template.base_prompt);
+    setSelectedTemplate(template.id);
     setShowTemplates(false);
-    
-    // 解析模板的技术参数
-    if (template.technical) {
-      // 这里可以智能匹配模板参数到对应的标签
-      const technicalMatches = TECHNICAL_TAGS.filter(tag => 
-        template.technical.toLowerCase().includes(tag.label.slice(0, 3).toLowerCase())
-      );
-      setSelectedTechnical(technicalMatches.map(tag => tag.value));
-    }
-    
-    // 解析模板的情绪参数
-    if (template.mood) {
-      const moodMatch = MOOD_TAGS.find(tag => 
-        template.mood.toLowerCase().includes(tag.label.slice(0, 3).toLowerCase())
-      );
-      if (moodMatch) {
-        setSelectedMood(moodMatch.value);
+
+    // 应用建议的标签（如果有）
+    if (template.suggested_tags) {
+      // 艺术风格
+      if (template.suggested_tags.art_style && template.suggested_tags.art_style.length > 0) {
+        setSelectedArtStyle(template.suggested_tags.art_style[0]);
+      }
+
+      // 主题风格
+      if (template.suggested_tags.theme_style && template.suggested_tags.theme_style.length > 0) {
+        setSelectedThemeStyle(template.suggested_tags.theme_style[0]);
+      }
+
+      // 情绪氛围
+      if (template.suggested_tags.mood && template.suggested_tags.mood.length > 0) {
+        setSelectedMood(template.suggested_tags.mood[0]);
+      }
+
+      // 技术参数
+      if (template.suggested_tags.technical && template.suggested_tags.technical.length > 0) {
+        setSelectedTechnical(template.suggested_tags.technical);
+      }
+
+      // 构图参数
+      if (template.suggested_tags.composition && template.suggested_tags.composition.length > 0) {
+        setSelectedComposition(template.suggested_tags.composition);
+      }
+
+      // 增强属性
+      if (template.suggested_tags.enhancement && template.suggested_tags.enhancement.length > 0) {
+        // 检查是否包含品质增强
+        const hasQuality = template.suggested_tags.enhancement.some(tag =>
+          tag.toLowerCase().includes('quality')
+        );
+        setIsQualityEnhanced(hasQuality);
       }
     }
   };
@@ -969,12 +989,11 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         />
       )}
 
-      {/* 场景模板面板 */}
+      {/* 场景模板浏览器 */}
       {showTemplates && (
-        <SceneTemplatesPanel
-          templates={SCENE_TEMPLATES}
-          selectedTemplate={selectedTemplate}
-          onSelect={applySceneTemplate}
+        <SceneTemplateBrowser
+          onSelectTemplate={applySceneTemplate}
+          selectedTemplateId={selectedTemplate}
         />
       )}
 
