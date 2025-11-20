@@ -64,7 +64,6 @@ function App() {
 
       if (isCallback) {
         try {
-          console.log('🔐 处理 OAuth 回调...');
           await handleAuthCallback();
           // 回调处理完成后，重定向到首页
           window.history.replaceState({}, '', '/');
@@ -92,7 +91,6 @@ function App() {
       try {
         // 只更新使用统计
         await updateUsageStats();
-        console.log('✅ 使用统计更新完成');
       } catch (error) {
         console.error('❌ 使用统计更新失败:', error);
         toast.error('使用统计加载失败', '请刷新页面重试');
@@ -106,7 +104,8 @@ function App() {
   // 懒加载画廊数据 - 只有切换到画廊视图时才加载
   useEffect(() => {
     // 只有在画廊视图且未加载过数据时才加载
-    if (viewMode !== 'gallery' || galleryLoaded || authLoading || !appUser) {
+    // 使用isLoading防止在加载过程中重复触发
+    if (viewMode !== 'gallery' || galleryLoaded || authLoading || !appUser || isLoading) {
       return;
     }
 
@@ -114,7 +113,6 @@ function App() {
       try {
         await loadHistoryWithPagination(1, true);
         setGalleryLoaded(true);
-        console.log('✅ 画廊数据加载完成');
       } catch (error) {
         console.error('❌ 画廊数据加载失败:', error);
         toast.error('画廊加载失败', '请检查网络连接后重试');
@@ -123,7 +121,7 @@ function App() {
 
     loadGalleryData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, galleryLoaded, authLoading, appUser?.id]);
+  }, [viewMode, galleryLoaded, authLoading, appUser?.id, isLoading]);
 
   // 监听生成完成，重置画廊加载状态
   useEffect(() => {

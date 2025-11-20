@@ -19,7 +19,6 @@ export async function uploadImagesToR2(
   batchId: string
 ): Promise<GenerationResult[]> {
   try {
-    console.log('🚀 开始上传图片到R2存储...');
     const imageUrls = results.map(result => result.imageUrl);
     const uploadResponse = await fetch('/.netlify/functions/upload-to-r2', {
       method: 'POST',
@@ -33,7 +32,6 @@ export async function uploadImagesToR2(
 
     if (uploadResponse.ok || uploadResponse.status === 206) {
       const uploadData = await uploadResponse.json();
-      console.log('✅ R2上传响应:', uploadData);
 
       // 更新results，添加R2 URL信息
       const uploadedResults = results.map((result, index) => {
@@ -60,14 +58,6 @@ export async function uploadImagesToR2(
         };
       });
 
-      // 显示成功或部分成功消息
-      if (uploadResponse.status === 206 && uploadData.warnings) {
-        console.warn('⚠️ 部分上传警告:', uploadData.warnings);
-        console.log(`📊 上传统计: ${uploadData.data.uploadedCount}/${uploadData.data.totalCount} 成功`);
-      } else {
-        console.log('✅ 所有图片上传成功');
-      }
-
       return uploadedResults;
     } else {
       const errorText = await uploadResponse.text().catch(() => '未知错误');
@@ -76,7 +66,6 @@ export async function uploadImagesToR2(
         error: errorText
       });
       // 保持原始URL，不阻塞整个流程
-      console.log('🔄 保持使用原始临时URL');
       return results;
     }
   } catch (r2Error) {

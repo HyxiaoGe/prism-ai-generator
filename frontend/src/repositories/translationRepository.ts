@@ -57,7 +57,7 @@ export class TranslationRepository extends BaseRepository {
         translated_prompt: params.translatedPrompt,
         translation_explanation: params.explanation || null,
         key_terms: params.keyTerms || [],
-        confidence: params.confidence || 95,
+        confidence: params.confidence || 0.95,
       }, {
         onConflict: 'original_prompt_hash'
       })

@@ -470,9 +470,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         try {
           const databaseService = DatabaseService.getInstance();
           const { generationBatches } = get();
-          
-          console.log(`🔍 开始加载反馈状态 - 共${generationBatches.length}个批次`);
-          
+
           // 🚀 性能优化：收集所有唯一的generation_id，避免重复查询
           const generationIds = new Set<string>();
           generationBatches.forEach(batch => {
@@ -481,14 +479,11 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               generationIds.add(generationId);
             }
           });
-          
+
           if (generationIds.size === 0) {
-            console.log('⚠️ 没有找到有效的generation_id，跳过反馈加载');
             return;
           }
-          
-          console.log(`📊 批量查询${generationIds.size}个generation的反馈（之前会有${generationBatches.reduce((sum, batch) => sum + batch.results.length, 0)}次查询）`);
-          
+
           // 🚀 使用新的批量查询API，一次请求获取所有反馈
           const feedbackMap = await databaseService.getBatchImageFeedback(Array.from(generationIds));
           
@@ -533,9 +528,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
             false,
             'loadFeedbackStates'
           );
-          
-          console.log(`✅ 反馈状态加载完成 - 优化后只需1次数据库查询`);
-          
+
         } catch (error) {
           console.error('❌ 加载反馈状态失败:', error);
         }
@@ -554,8 +547,6 @@ export const useAIGenerationStore = create<AIGenerationState>()(
               pagination: { ...state.pagination, isLoadingMore: true }
             }), false, 'loadHistoryWithPagination');
           }
-
-          console.log(`📄 ${replace ? '重新' : '分页'}加载历史记录 - 第${page}页`);
 
           // 获取分页数据
           const result = await databaseService.getUserGenerationsWithPagination({ page, limit: 10 });
