@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAIGenerationStore } from '../../../store/aiGenerationStore';
+import { useAuthStore } from '../../../store/authStore';
 import { AIService } from '../services/aiService';
 import { PromptAssistant } from './PromptAssistant';
 import { TagSelectorGroup } from './TagSelectorGroup';
@@ -69,8 +70,9 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   const [hasAnalysisResult, setHasAnalysisResult] = useState(false); // 是否已有分析结果
   const [fullOptimizedPrompt, setFullOptimizedPrompt] = useState<string | null>(null); // 🔥 保存完整的优化提示词
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
+
   const { startGeneration, currentConfig } = useAIGenerationStore();
+  const { appUser } = useAuthStore();
 
   // 🌐 新增：翻译相关状态
   const [showTranslation, setShowTranslation] = useState(false); // 是否显示翻译
@@ -680,8 +682,17 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
     console.log('🎯 PromptInput开始生成');
     console.log('🔥 使用提示词:', effectivePrompt);
     console.log('🔥 是否使用优化提示词:', fullOptimizedPrompt ? '是' : '否');
-    
+
     if (!effectivePrompt.trim() || disabled) return;
+
+    // 🔥 前置用量检查
+    if (appUser) {
+      const remainingQuota = appUser.daily_quota - appUser.used_today;
+      if (remainingQuota <= 0) {
+        alert('今日生成次数已用完，明日凌晨自动重置！');
+        return;
+      }
+    }
 
     // 收集所有选择的标签信息
     const selectedTags = {
@@ -1035,10 +1046,43 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         />
       )}
 
+      {/* 配额状态显示 */}
+      {appUser && (
+        <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2.5 h-2.5 rounded-full ${
+                (appUser.daily_quota - appUser.used_today) > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+              }`}></div>
+              <span className="text-sm font-medium text-gray-700">今日配额</span>
+            </div>
+            <div className="text-right">
+              <span className={`text-lg font-bold ${
+                (appUser.daily_quota - appUser.used_today) > 0 ? 'text-blue-600' : 'text-red-600'
+              }`}>
+                {appUser.daily_quota - appUser.used_today}
+              </span>
+              <span className="text-gray-500 text-sm"> / {appUser.daily_quota}</span>
+            </div>
+          </div>
+          {(appUser.daily_quota - appUser.used_today) <= 0 && (
+            <div className="mt-2 text-xs text-red-600">
+              ⚠️ 今日配额已用完，明日凌晨自动重置
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 生成按钮 */}
       <button
         onClick={handleGenerate}
-        disabled={!fullPrompt.trim() || disabled || aiState.isAnalyzing || aiState.isOptimizing}
+        disabled={
+          !fullPrompt.trim() ||
+          disabled ||
+          aiState.isAnalyzing ||
+          aiState.isOptimizing ||
+          (appUser && (appUser.daily_quota - appUser.used_today) <= 0)
+        }
         className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-medium rounded-xl transition-all duration-200 disabled:cursor-not-allowed"
       >
         {aiState.isAnalyzing ? (
@@ -1055,11 +1099,13 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
             </svg>
             AI优化中...
           </div>
+        ) : (appUser && (appUser.daily_quota - appUser.used_today) <= 0) ? (
+          '配额已用完'
         ) : (
           '😊 开始生成'
         )}
       </button>
-      
+
       <div className="text-center text-xs text-gray-500">
         提示：使用 Ctrl+Enter (Mac: Cmd+Enter) 快速生成
       </div>

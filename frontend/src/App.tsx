@@ -124,24 +124,13 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, galleryLoaded, authLoading, appUser?.id]);
 
-  // 监听生成状态变化，自动管理视图模式
+  // 监听生成完成，重置画廊加载状态
   useEffect(() => {
-    if (currentGeneration.isGenerating) {
-      // 生成开始时切换到创作模式，关闭设置面板
-      setViewMode('create');
-      setShowSettings(false);
-    } else if (currentGeneration.stage === 'completed') {
-      // 生成完成时切换到画廊模式，清空侧边栏提示词
-      setViewMode('gallery');
-      setSidebarPrompt('');
-      setSuggestedTags(null);
-      // 重置画廊加载状态，强制刷新数据（因为有新生成的图片）
+    if (currentGeneration.stage === 'completed') {
+      // 生成完成时重置画廊加载状态，确保下次进入画廊能看到新图片
       setGalleryLoaded(false);
-    } else if (currentGeneration.stage === 'error') {
-      // 生成失败时回到首页
-      setViewMode('home');
     }
-  }, [currentGeneration.isGenerating, currentGeneration.stage]);
+  }, [currentGeneration.stage]);
 
   // 处理搜索框生成（简化版，主要通过PromptInput处理）
   const handleSearchGenerate = () => {
@@ -535,12 +524,12 @@ function App() {
 
       {/* 设置面板 */}
       {showSettings && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setShowSettings(false)}
+          onClick={() => !currentGeneration.isGenerating && setShowSettings(false)}
         >
-          <div 
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col"
+          <div
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 固定标题栏 */}
@@ -548,22 +537,125 @@ function App() {
               <h2 className="text-xl font-bold text-gray-900">AI图像生成</h2>
               <button
                 onClick={() => setShowSettings(false)}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                disabled={currentGeneration.isGenerating}
+                className={`p-2 rounded-xl transition-colors ${
+                  currentGeneration.isGenerating
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'hover:bg-gray-100'
+                }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            
+
             {/* 可滚动内容区域 */}
             <div className="flex-1 overflow-y-auto">
-              <SettingsTabs 
-                initialPrompt={sidebarPrompt} 
+              <SettingsTabs
+                initialPrompt={sidebarPrompt}
                 suggestedTags={suggestedTags}
                 parsedFeatures={currentConfig.parsedFeatures}
+                disabled={currentGeneration.isGenerating}
               />
             </div>
+
+            {/* 生成中遮罩层 */}
+            {currentGeneration.isGenerating && (
+              <div className="absolute inset-0 bg-white/98 z-10 rounded-2xl flex items-center justify-center">
+                <LoadingIndicator />
+              </div>
+            )}
+
+            {/* 生成完成预览 */}
+            {currentGeneration.stage === 'completed' && !currentGeneration.isGenerating && (
+              <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col items-center justify-center p-8">
+                <div className="text-center space-y-6">
+                  {/* 成功图标动画 */}
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto animate-bounce-once">
+                    <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">✨ 生成完成！</h3>
+                    <p className="text-gray-600">您的AI作品已经创作完成</p>
+                  </div>
+
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => {
+                        setViewMode('gallery');
+                        setShowSettings(false);
+                        setSidebarPrompt('');
+                        setSuggestedTags(null);
+                      }}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                    >
+                      查看作品
+                    </button>
+                    <button
+                      onClick={() => {
+                        // 重置生成状态，允许继续创作
+                        useAIGenerationStore.getState().resetGeneration();
+                      }}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
+                    >
+                      继续创作
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 生成失败提示 */}
+            {currentGeneration.stage === 'error' && !currentGeneration.isGenerating && (
+              <div className="absolute inset-0 bg-white z-10 rounded-2xl flex flex-col items-center justify-center p-8">
+                <div className="text-center space-y-6 max-w-md">
+                  {/* 错误图标 */}
+                  <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">生成失败</h3>
+                    <p className="text-gray-600 mb-4">{currentGeneration.error || '发生了未知错误'}</p>
+                    <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg text-left">
+                      <p className="font-medium mb-2">💡 可能的原因：</p>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>网络连接不稳定</li>
+                        <li>提示词包含敏感内容</li>
+                        <li>服务器繁忙，请稍后重试</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => {
+                        // 重置生成状态，保留设置
+                        useAIGenerationStore.getState().resetGeneration();
+                      }}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                    >
+                      重新生成
+                    </button>
+                    <button
+                      onClick={() => {
+                        useAIGenerationStore.getState().resetGeneration();
+                        setShowSettings(false);
+                      }}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-300"
+                    >
+                      关闭
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

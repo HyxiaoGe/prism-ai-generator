@@ -278,6 +278,13 @@ export const useAIGenerationStore = create<AIGenerationState>()(
           'cancelGeneration'
         ),
 
+      resetGeneration: () =>
+        set(
+          { currentGeneration: initialGenerationStatus },
+          false,
+          'resetGeneration'
+        ),
+
       clearHistory: () =>
         set({ generationHistory: [] }, false, 'clearHistory'),
 
