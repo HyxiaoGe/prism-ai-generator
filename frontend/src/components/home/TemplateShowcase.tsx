@@ -60,15 +60,30 @@ export function TemplateShowcase({
 
   // 连续自动滚动效果（类似弹幕）
   useEffect(() => {
+    console.log('🔄 滚动 Effect 触发:', {
+      isAutoScrolling,
+      hasContainer: !!scrollContainerRef.current,
+      templateCount: featuredTemplates.length,
+      isPaused,
+    });
+
     if (!isAutoScrolling || !scrollContainerRef.current || featuredTemplates.length === 0) {
+      console.log('❌ 滚动条件不满足，跳过');
       return;
     }
 
     const scrollContainer = scrollContainerRef.current;
     let lastTimestamp = 0;
 
-    // 添加一个小延迟，确保 DOM 完全渲染
+    // 添加一个更长的延迟，确保 DOM 完全渲染和图片加载
     const startDelay = setTimeout(() => {
+      console.log('✅ 开始启动滚动动画');
+
+      // 检查滚动容器的尺寸
+      const scrollWidth = scrollContainer.scrollWidth;
+      const clientWidth = scrollContainer.clientWidth;
+      console.log('📏 容器尺寸:', { scrollWidth, clientWidth, halfWidth: (scrollWidth - clientWidth) / 2 });
+
       const smoothScroll = (timestamp: number) => {
         if (!scrollContainer) return;
 
@@ -106,10 +121,11 @@ export function TemplateShowcase({
 
       // 开始动画
       animationFrameRef.current = requestAnimationFrame(smoothScroll);
-    }, 100); // 延迟100ms等待DOM渲染
+    }, 500); // 增加延迟到500ms
 
     // 清理函数
     return () => {
+      console.log('🧹 清理滚动动画');
       clearTimeout(startDelay);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -162,16 +178,23 @@ export function TemplateShowcase({
       }
 
       // 按分类加载模板
-      await loadCategorizedTemplates(categoriesData);
+      const categoryTemplatesMap = await loadCategorizedTemplates(categoriesData);
 
-      // 批量查询所有模板的收藏状态（一次性查询，避免N次请求）
-      const allTemplateIds = Array.from(new Set([
-        ...popularTemplates.map(t => t.id),
-        ...topRatedTemplates.map(t => t.id),
-        ...latestTemplates.map(t => t.id),
-      ]));
+      // 批量查询所有模板的收藏状态（包括精选推荐和分类模板，一次性查询）
+      const allTemplateIds = new Set<string>();
 
-      const favoriteMap = await templateService.getBatchFavoriteStatus(allTemplateIds);
+      // 添加精选推荐的模板 ID
+      popularTemplates.forEach(t => allTemplateIds.add(t.id));
+      topRatedTemplates.forEach(t => allTemplateIds.add(t.id));
+      latestTemplates.forEach(t => allTemplateIds.add(t.id));
+
+      // 添加所有分类模板的 ID
+      categoryTemplatesMap.forEach(templates => {
+        templates.forEach(t => allTemplateIds.add(t.id));
+      });
+
+      console.log(`📊 批量查询 ${allTemplateIds.size} 个模板的收藏状态`);
+      const favoriteMap = await templateService.getBatchFavoriteStatus(Array.from(allTemplateIds));
       setFavoriteStatusMap(favoriteMap);
     } catch (error) {
       console.error('加载模板失败:', error);
@@ -181,7 +204,7 @@ export function TemplateShowcase({
   };
 
   // 按分类加载模板
-  const loadCategorizedTemplates = async (categoriesData: CategoryInfo[]) => {
+  const loadCategorizedTemplates = async (categoriesData: CategoryInfo[]): Promise<Map<string, SceneTemplate[]>> => {
     try {
       // 统计主分类
       const categoryMap = new Map<string, number>();
@@ -210,8 +233,10 @@ export function TemplateShowcase({
       );
 
       setCategorizedTemplates(templateMap);
+      return templateMap; // 返回 templateMap 用于批量查询收藏状态
     } catch (error) {
       console.error('加载分类模板失败:', error);
+      return new Map(); // 发生错误时返回空 Map
     }
   };
 
@@ -437,6 +462,8 @@ export function TemplateShowcase({
                 showViewAll={selectedCategory === 'all'}
                 onViewAll={handleViewAll}
                 previewCount={selectedCategory === 'all' ? 3 : 12}
+                favoriteStatusMap={favoriteStatusMap}
+                onFavoriteChange={handleFavoriteChange}
               />
             </div>
           );
