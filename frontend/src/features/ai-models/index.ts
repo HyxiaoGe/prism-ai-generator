@@ -11,6 +11,9 @@ export { ImageGrid } from './components/ImageGrid';
 export { PromptFeatures, PromptFeaturesInline } from './components/PromptFeatures';
 export { ModelSelector } from './components/ModelSelector';
 export { SettingsTabs } from './components/SettingsTabs';
+export { GenerationModeSelector } from './components/GenerationModeSelector';
+export { QuickModePanel } from './components/QuickModePanel';
+export { ScenePackCard } from './components/ScenePackCard';
 
 // 适配器系统
 export { AdapterManager } from './services/AdapterManager';

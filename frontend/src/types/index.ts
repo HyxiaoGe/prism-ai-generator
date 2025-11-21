@@ -26,6 +26,8 @@ export interface GenerationConfig {
     // negative 已移除 - 现代AI模型不需要负面提示词
     isQualityEnhanced?: boolean;
   };
+  // 新增：场景包ID（用于追踪场景包使用情况）
+  scenePackId?: string;
 }
 
 // R2存储信息
