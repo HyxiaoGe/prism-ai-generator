@@ -62,21 +62,28 @@ export function TemplateShowcase({
   useEffect(() => {
     console.log('🔄 滚动 Effect 触发:', {
       isAutoScrolling,
-      hasContainer: !!scrollContainerRef.current,
       templateCount: featuredTemplates.length,
       isPaused,
     });
 
-    if (!isAutoScrolling || !scrollContainerRef.current || featuredTemplates.length === 0) {
+    // 只检查基本条件，不检查 ref（因为 DOM 可能还没渲染）
+    if (!isAutoScrolling || featuredTemplates.length === 0) {
       console.log('❌ 滚动条件不满足，跳过');
       return;
     }
 
-    const scrollContainer = scrollContainerRef.current;
     let lastTimestamp = 0;
 
-    // 添加一个更长的延迟，确保 DOM 完全渲染和图片加载
+    // 添加一个延迟，确保 DOM 完全渲染
     const startDelay = setTimeout(() => {
+      const scrollContainer = scrollContainerRef.current;
+
+      // 在延迟后检查 ref 是否存在
+      if (!scrollContainer) {
+        console.error('⚠️ 滚动容器未找到，DOM 可能还未渲染');
+        return;
+      }
+
       console.log('✅ 开始启动滚动动画');
 
       // 检查滚动容器的尺寸
