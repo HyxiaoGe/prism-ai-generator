@@ -509,7 +509,7 @@ function App() {
           onClick={() => !currentGeneration.isGenerating && setShowSettings(false)}
         >
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col relative"
+            className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 固定标题栏 */}

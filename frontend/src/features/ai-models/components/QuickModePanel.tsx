@@ -25,9 +25,10 @@ export function QuickModePanel({ onPackSelected, onPromptChange }: QuickModePane
     setSelectedPack(pack);
     applyScenePack(pack);
     onPackSelected?.(pack);
-    // 清空提示词，让用户输入新的
-    setQuickPrompt('');
-    onPromptChange?.('');
+    // 自动填充第一个示例作为默认提示词
+    const defaultPrompt = pack.examples[0] || '';
+    setQuickPrompt(defaultPrompt);
+    onPromptChange?.(defaultPrompt);
   };
 
   // 处理提示词变化
@@ -234,8 +235,11 @@ export function QuickModePanel({ onPackSelected, onPromptChange }: QuickModePane
           {/* 🔥 新增：提示词输入区 */}
           <div className="mt-6 space-y-3">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                📝 描述你想要的内容
+              <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <span>📝 描述你想要的内容</span>
+                <span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                  已自动填充示例
+                </span>
               </label>
               <textarea
                 value={quickPrompt}
@@ -245,7 +249,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange }: QuickModePane
                 rows={3}
               />
               <p className="mt-2 text-xs text-gray-500">
-                💡 提示：场景包参数已自动配置，你只需描述具体内容即可
+                💡 提示：已自动填充示例提示词，你可以直接生成或修改后生成
               </p>
             </div>
           </div>
