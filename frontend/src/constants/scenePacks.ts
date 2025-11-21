@@ -27,7 +27,8 @@ export interface ScenePack {
 
   // 推荐配置
   recommendedModel: string;      // 推荐模型
-  recommendedAspectRatio: string; // 推荐宽高比
+  // recommendedAspectRatio: string; // 推荐宽高比
+  recommendedAspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
   recommendedSteps?: number;     // 推荐步数
 
   // 辅助信息
