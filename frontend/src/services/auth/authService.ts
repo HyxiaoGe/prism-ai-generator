@@ -27,6 +27,14 @@ export class AuthService {
   private static instance: AuthService;
   private userRepository: UserRepository;
 
+  // 用户信息缓存
+  private appUserCache: AppUser | null = null;
+  private appUserCacheExpiry: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
+  private supabaseUserCache: SupabaseUser | null = null;
+  private supabaseUserCacheExpiry: number = 0;
+
   private constructor() {
     this.userRepository = UserRepository.getInstance();
   }
@@ -149,6 +157,19 @@ export class AuthService {
     if (error) {
       throw new Error(`登出失败: ${error.message}`);
     }
+
+    // 清除缓存
+    this.clearCache();
+  }
+
+  /**
+   * 清除用户信息缓存
+   */
+  clearCache(): void {
+    this.appUserCache = null;
+    this.appUserCacheExpiry = 0;
+    this.supabaseUserCache = null;
+    this.supabaseUserCacheExpiry = 0;
   }
 
   // ============================================
@@ -168,25 +189,50 @@ export class AuthService {
   }
 
   /**
-   * 获取当前 Supabase 用户
+   * 获取当前 Supabase 用户（带缓存）
    */
   async getSupabaseUser(): Promise<SupabaseUser | null> {
+    const now = Date.now();
+
+    // 检查缓存是否有效
+    if (this.supabaseUserCache && now < this.supabaseUserCacheExpiry) {
+      return this.supabaseUserCache;
+    }
+
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) {
       console.error('获取用户失败:', error);
       return null;
     }
+
+    // 更新缓存
+    this.supabaseUserCache = user;
+    this.supabaseUserCacheExpiry = now + this.CACHE_DURATION;
+
     return user;
   }
 
   /**
-   * 获取当前应用用户（从 users 表）
+   * 获取当前应用用户（从 users 表，带缓存）
    */
   async getAppUser(): Promise<AppUser | null> {
+    const now = Date.now();
+
+    // 检查缓存是否有效
+    if (this.appUserCache && now < this.appUserCacheExpiry) {
+      return this.appUserCache;
+    }
+
     const supabaseUser = await this.getSupabaseUser();
     if (!supabaseUser) {
       // 未登录，尝试获取匿名用户
-      return this.getOrCreateAnonymousUser();
+      const anonymousUser = await this.getOrCreateAnonymousUser();
+
+      // 缓存匿名用户（较短的缓存时间，因为匿名用户可能会变化）
+      this.appUserCache = anonymousUser;
+      this.appUserCacheExpiry = now + 60 * 1000; // 1分钟缓存
+
+      return anonymousUser;
     }
 
     // 根据 Supabase 用户查找应用用户
@@ -199,6 +245,10 @@ export class AuthService {
     if (!appUser) {
       appUser = await this.createAppUserFromSupabase(supabaseUser);
     }
+
+    // 更新缓存
+    this.appUserCache = appUser;
+    this.appUserCacheExpiry = now + this.CACHE_DURATION;
 
     return appUser;
   }
@@ -219,6 +269,9 @@ export class AuthService {
    * 在回调页面调用此方法
    */
   async handleAuthCallback(): Promise<AppUser | null> {
+    // 清除缓存，确保获取最新用户信息
+    this.clearCache();
+
     const supabaseUser = await this.getSupabaseUser();
     if (!supabaseUser) {
       return null;
