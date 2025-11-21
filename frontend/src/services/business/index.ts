@@ -11,3 +11,4 @@ export { TranslationService } from './translationService';
 export { ConfigService } from './configService';
 export { SceneTemplateService } from './sceneTemplateService';
 export type { TemplateBrowseOptions, TemplateRecommendation } from './sceneTemplateService';
+export { ScenePackIntegrationService, scenePackIntegration } from './scenePackIntegrationService';

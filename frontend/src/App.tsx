@@ -16,6 +16,7 @@ import { useToast } from './hooks/useToast';
 import { initializeDebugTools } from './utils/debugDatabase';
 import { TemplateShowcase } from './components/home';
 import { SceneTemplateService } from './services/business';
+import { scenePackIntegration } from './services/business/scenePackIntegrationService';
 import type { GenerationResult } from './types';
 import type { SceneTemplate } from './types/database';
 
@@ -143,27 +144,25 @@ function App() {
     setShowSettings(true);
   };
 
-  // 处理模板点击（支持硬编码模板和数据库模板）
+  // 处理模板点击（支持场景包、数据库模板、硬编码模板）
   const handleTemplateClick = async (template: any | SceneTemplate) => {
-    // 判断是否为数据库模板（有id字段）
-    if ('id' in template && template.id) {
-      // 数据库模板
-      try {
-        const templateService = SceneTemplateService.getInstance();
-        const { basePrompt, suggestedTags } = await templateService.applyTemplate(template.id);
+    try {
+      // 使用集成服务统一处理场景包和模板
+      const { basePrompt, suggestedTags, config } = await scenePackIntegration.applyItem(template);
 
-        setSidebarPrompt(basePrompt);
-        setSuggestedTags(suggestedTags);
-        setShowSettings(true);
-      } catch (error) {
-        console.error('应用模板失败:', error);
-        toast.error('模板加载失败', '请重试或选择其他模板');
+      setSidebarPrompt(basePrompt);
+      setSuggestedTags(suggestedTags);
+
+      // 如果是场景包，还要应用额外的模型和参数配置
+      if (config) {
+        const { updateConfig } = useAIGenerationStore.getState();
+        updateConfig(config);
       }
-    } else {
-      // 硬编码模板（向后兼容）
-      setSidebarPrompt(template.prompt);
-      setSuggestedTags(template.suggestedTags);
+
       setShowSettings(true);
+    } catch (error) {
+      console.error('应用模板失败:', error);
+      toast.error('模板加载失败', '请重试或选择其他模板');
     }
   };
 
