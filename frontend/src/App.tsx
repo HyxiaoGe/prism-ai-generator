@@ -47,6 +47,7 @@ function App() {
   const [currentPrompt, setCurrentPrompt] = useState(''); // 当前输入的提示词（用于统一生成按钮）
   const [isProcessing, setIsProcessing] = useState(false); // AI处理状态（分析、优化等）
   const [selectedScenePackId, setSelectedScenePackId] = useState<string | null>(null); // 从首页选中的场景包ID
+  const [currentTab, setCurrentTab] = useState<'model' | 'prompt' | 'advanced'>('model'); // 当前tab
 
   // Toast 通知系统
   const toast = useToast();
@@ -150,6 +151,15 @@ function App() {
 
   // 处理模板点击（支持场景包、数据库模板、硬编码模板）
   const handleTemplateClick = async (template: any | SceneTemplate) => {
+    // 立即打开设置面板，避免卡顿
+    setShowSettings(true);
+
+    // 保存选中的场景包ID（用于在快速模式中自动选中）
+    if (template.id) {
+      setSelectedScenePackId(template.id);
+    }
+
+    // 异步处理其他逻辑
     try {
       // 使用集成服务统一处理场景包和模板（已升级为完整应用逻辑）
       const result = await scenePackIntegration.applyItem(template);
@@ -157,11 +167,6 @@ function App() {
       // 设置侧边栏提示词（使用基础提示词，完整提示词会在生成时构建）
       setSidebarPrompt(result.basePrompt);
       setSuggestedTags(result.suggestedTags);
-
-      // 保存选中的场景包ID（用于在快速模式中自动选中）
-      if (template.id) {
-        setSelectedScenePackId(template.id);
-      }
 
       // 应用完整的生成配置（包括模型、宽高比、步数等）
       const { updateConfig } = useAIGenerationStore.getState();
@@ -187,8 +192,6 @@ function App() {
           }
         ).catch(err => console.error('记录场景包使用失败:', err));
       }
-
-      setShowSettings(true);
     } catch (error) {
       console.error('应用模板失败:', error);
       toast.error('模板加载失败', '请重试或选择其他模板');
@@ -547,6 +550,7 @@ function App() {
                 onPromptChange={setCurrentPrompt}
                 onProcessingChange={setIsProcessing}
                 selectedScenePackId={selectedScenePackId}
+                onTabChange={setCurrentTab}
               />
             </div>
 
@@ -556,6 +560,9 @@ function App() {
                 prompt={currentPrompt}
                 disabled={currentGeneration.isGenerating}
                 isProcessing={isProcessing}
+                currentTab={currentTab}
+                selectedScenePackId={selectedScenePackId}
+                onNext={() => setCurrentTab('prompt')}
               />
             </div>
 

@@ -12,9 +12,10 @@ interface SettingsTabsProps {
   onPromptChange?: (prompt: string) => void; // 提示词变化回调
   onProcessingChange?: (isProcessing: boolean) => void; // 处理状态变化回调
   selectedScenePackId?: string | null; // 从首页选中的场景包ID
+  onTabChange?: (tab: TabId) => void; // tab切换回调
 }
 
-type TabId = 'model' | 'prompt' | 'advanced';
+export type TabId = 'model' | 'prompt' | 'advanced';
 
 const tabs = [
   { id: 'model' as TabId, label: '模型配置', icon: Settings },
@@ -29,17 +30,17 @@ export function SettingsTabs({
   parsedFeatures,
   onPromptChange,
   onProcessingChange,
-  selectedScenePackId
+  selectedScenePackId,
+  onTabChange
 }: SettingsTabsProps) {
-  // 如果从首页选择了场景包，自动切换到提示词tab，否则默认显示模型配置
-  const [activeTab, setActiveTab] = useState<TabId>(selectedScenePackId ? 'prompt' : 'model');
+  // 始终从模型配置tab开始，不管是否选择了场景包
+  const [activeTab, setActiveTab] = useState<TabId>('model');
 
-  // 当selectedScenePackId变化时，自动切换到提示词tab
-  useEffect(() => {
-    if (selectedScenePackId) {
-      setActiveTab('prompt');
-    }
-  }, [selectedScenePackId]);
+  // 处理tab切换
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -50,7 +51,7 @@ export function SettingsTabs({
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
                 activeTab === tab.id
                   ? 'text-blue-600 bg-white border-b-2 border-blue-600'
