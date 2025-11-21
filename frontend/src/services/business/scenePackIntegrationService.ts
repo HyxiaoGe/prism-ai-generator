@@ -470,6 +470,164 @@ export class ScenePackIntegrationService {
       return SCENE_PACKS.slice(0, limit);
     }
   }
+
+  // ============================================
+  // 搜索和筛选功能
+  // ============================================
+
+  /**
+   * 搜索和筛选场景包
+   */
+  async searchScenePacks(options: {
+    searchText?: string;
+    category?: ScenePack['category'];
+    difficulty?: ScenePack['difficulty'];
+    tags?: string[];
+    isOfficial?: boolean;
+    sortBy?: 'popularity' | 'name' | 'created_at' | 'usage_count' | 'search_relevance';
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: ScenePack[]; total: number }> {
+    try {
+      console.log('🔍 搜索场景包:', options);
+
+      const {
+        searchText,
+        category,
+        difficulty,
+        tags,
+        isOfficial,
+        sortBy = 'popularity',
+        limit = 20,
+        offset = 0,
+      } = options;
+
+      // 调用数据库搜索函数
+      const { data, error } = await supabase.rpc('search_scene_packs', {
+        p_search_text: searchText || null,
+        p_category: category || null,
+        p_difficulty: difficulty || null,
+        p_tags: tags || null,
+        p_is_official: isOfficial ?? null,
+        p_sort_by: sortBy,
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (error) {
+        console.error('搜索场景包失败:', error);
+        // 降级：使用硬编码场景包进行简单过滤
+        return this.searchScenePacksLocally(options);
+      }
+
+      if (!data || data.length === 0) {
+        return { items: [], total: 0 };
+      }
+
+      // 将数据库结果转换为 ScenePack 格式
+      const items: ScenePack[] = data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        nameEn: item.name_en,
+        icon: item.icon,
+        category: item.category,
+        preview: item.thumbnail_url,
+        description: item.description,
+        difficulty: item.difficulty,
+        tags: {}, // 简化处理，实际应该从 suggested_tags 解析
+        recommendedModel: item.recommended_model,
+        recommendedAspectRatio: item.recommended_aspect_ratio,
+        recommendedSteps: item.recommended_steps,
+        examples: item.examples || [],
+        exampleImages: item.example_images || [],
+        tips: item.tips,
+        usageCount: item.usage_count || 0,
+      }));
+
+      return {
+        items,
+        total: items.length, // 如果需要总数，可以再执行一次 COUNT 查询
+      };
+    } catch (error) {
+      console.error('搜索场景包异常:', error);
+      return this.searchScenePacksLocally(options);
+    }
+  }
+
+  /**
+   * 本地搜索场景包（降级方案）
+   */
+  private searchScenePacksLocally(options: {
+    searchText?: string;
+    category?: ScenePack['category'];
+    difficulty?: ScenePack['difficulty'];
+    tags?: string[];
+    isOfficial?: boolean;
+    limit?: number;
+    offset?: number;
+  }): { items: ScenePack[]; total: number } {
+    const {
+      searchText,
+      category,
+      difficulty,
+      limit = 20,
+      offset = 0,
+    } = options;
+
+    let filtered = [...SCENE_PACKS];
+
+    // 文本搜索
+    if (searchText) {
+      const lowerSearch = searchText.toLowerCase();
+      filtered = filtered.filter(
+        pack =>
+          pack.name.toLowerCase().includes(lowerSearch) ||
+          pack.nameEn.toLowerCase().includes(lowerSearch) ||
+          pack.description.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    // 分类筛选
+    if (category) {
+      filtered = filtered.filter(pack => pack.category === category);
+    }
+
+    // 难度筛选
+    if (difficulty) {
+      filtered = filtered.filter(pack => pack.difficulty === difficulty);
+    }
+
+    // 分页
+    const total = filtered.length;
+    const items = filtered.slice(offset, offset + limit);
+
+    return { items, total };
+  }
+
+  /**
+   * 获取场景包分类统计
+   */
+  async getCategoryStats(): Promise<
+    Array<{ category: string; count: number; officialCount: number }>
+  > {
+    try {
+      const { data, error } = await supabase.rpc('get_scene_pack_category_stats');
+
+      if (error) {
+        console.error('获取分类统计失败:', error);
+        return [];
+      }
+
+      return (data || []).map((item: any) => ({
+        category: item.category,
+        count: item.count,
+        officialCount: item.official_count,
+      }));
+    } catch (error) {
+      console.error('获取分类统计异常:', error);
+      return [];
+    }
+  }
 }
 
 // 导出单例
