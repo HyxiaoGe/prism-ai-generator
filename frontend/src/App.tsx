@@ -147,16 +147,25 @@ function App() {
   // 处理模板点击（支持场景包、数据库模板、硬编码模板）
   const handleTemplateClick = async (template: any | SceneTemplate) => {
     try {
-      // 使用集成服务统一处理场景包和模板
-      const { basePrompt, suggestedTags, config } = await scenePackIntegration.applyItem(template);
+      // 使用集成服务统一处理场景包和模板（已升级为完整应用逻辑）
+      const result = await scenePackIntegration.applyItem(template);
 
-      setSidebarPrompt(basePrompt);
-      setSuggestedTags(suggestedTags);
+      // 设置侧边栏提示词（使用基础提示词，完整提示词会在生成时构建）
+      setSidebarPrompt(result.basePrompt);
+      setSuggestedTags(result.suggestedTags);
 
-      // 如果是场景包，还要应用额外的模型和参数配置
-      if (config) {
-        const { updateConfig } = useAIGenerationStore.getState();
-        updateConfig(config);
+      // 应用完整的生成配置（包括模型、宽高比、步数等）
+      const { updateConfig } = useAIGenerationStore.getState();
+      updateConfig(result.config);
+
+      // 显示应用成功的提示
+      const sourceName = result.source === 'scene_pack' ? '场景包' : '模板';
+      const templateName = result.config.scenePackName || result.config.templateName || '未知';
+      toast.success('应用成功', `已应用${sourceName}：${templateName}`);
+
+      // 如果有警告信息，也显示出来
+      if (result.warnings.length > 0) {
+        console.warn('⚠️  场景包应用警告:', result.warnings);
       }
 
       setShowSettings(true);
