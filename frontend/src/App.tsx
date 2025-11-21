@@ -168,6 +168,17 @@ function App() {
         console.warn('⚠️  场景包应用警告:', result.warnings);
       }
 
+      // 记录场景包使用（异步，不阻塞UI）
+      if (result.source === 'scene_pack' && result.config.scenePackId && appUser) {
+        scenePackIntegration.trackScenePackUsage(
+          result.config.scenePackId,
+          appUser.id,
+          {
+            appliedConfig: result.config,
+          }
+        ).catch(err => console.error('记录场景包使用失败:', err));
+      }
+
       setShowSettings(true);
     } catch (error) {
       console.error('应用模板失败:', error);

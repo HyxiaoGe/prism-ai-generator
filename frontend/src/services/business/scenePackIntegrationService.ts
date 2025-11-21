@@ -11,6 +11,7 @@
 import { SCENE_PACKS, type ScenePack } from '@/constants/scenePacks';
 import { SceneTemplateService } from './sceneTemplateService';
 import { tagMappingService, type TagExpansionResult } from './tagMappingService';
+import { supabase } from '@/config/supabase';
 import type { SceneTemplate } from '@/types/database';
 import type { GenerationConfig } from '@/types';
 
@@ -358,36 +359,115 @@ export class ScenePackIntegrationService {
   // ============================================
 
   /**
-   * 获取场景包的统计信息
-   * TODO: 需要实现数据库持久化
+   * 获取场景包的统计信息（已实现数据库持久化）
    */
   async getScenePackStats(scenePackId: string): Promise<ScenePackStats> {
-    // TODO: 从数据库查询
-    // 可以创建 scene_pack_usage 表或复用 template_usage_history
-    console.warn('⚠️  getScenePackStats 尚未实现数据库持久化');
+    try {
+      // 查询统计视图
+      const { data, error } = await supabase
+        .from('v_scene_pack_stats' as any)
+        .select('*')
+        .eq('scene_pack_id', scenePackId)
+        .single();
 
-    return {
-      usageCount: 0,
-      avgRating: 0,
-    };
+      if (error) {
+        console.error('查询场景包统计失败:', error);
+        return { usageCount: 0, avgRating: 0 };
+      }
+
+      if (!data) {
+        return { usageCount: 0, avgRating: 0 };
+      }
+
+      return {
+        usageCount: data.total_usage_count || 0,
+        avgRating: data.avg_rating || 0,
+        lastUsed: data.last_used_at ? new Date(data.last_used_at) : undefined,
+        favoritesCount: 0, // TODO: 实现收藏功能
+      };
+    } catch (error) {
+      console.error('获取场景包统计失败:', error);
+      return { usageCount: 0, avgRating: 0 };
+    }
   }
 
   /**
-   * 记录场景包使用
-   * TODO: 需要实现数据库持久化
+   * 记录场景包使用（已实现数据库持久化）
    */
-  async trackScenePackUsage(scenePackId: string, userId: string): Promise<void> {
+  async trackScenePackUsage(
+    scenePackId: string,
+    userId: string,
+    options?: {
+      generationId?: string;
+      wasSuccessful?: boolean;
+      userRating?: number;
+      appliedConfig?: Partial<GenerationConfig>;
+    }
+  ): Promise<void> {
     try {
-      // TODO: 保存到数据库
-      console.log('📊 场景包使用记录:', { scenePackId, userId, timestamp: new Date() });
+      console.log('📊 记录场景包使用:', { scenePackId, userId });
 
-      // 可选方案：
-      // 1. 创建 scene_pack_usage 表
-      // 2. 复用 template_usage_history 表
-      // 3. 扩展 user_events 表
+      // 调用数据库函数记录使用
+      const { data, error } = await supabase.rpc('record_scene_pack_usage', {
+        p_scene_pack_id: scenePackId,
+        p_template_id: null,
+        p_user_id: userId,
+        p_generation_id: options?.generationId || null,
+        p_was_successful: options?.wasSuccessful ?? true,
+        p_user_rating: options?.userRating || null,
+        p_applied_config: options?.appliedConfig ? JSON.stringify(options.appliedConfig) : null,
+      });
 
+      if (error) {
+        console.error('记录场景包使用失败:', error);
+        return;
+      }
+
+      console.log('✅ 场景包使用已记录:', data);
     } catch (error) {
-      console.error('记录场景包使用失败:', error);
+      console.error('记录场景包使用异常:', error);
+    }
+  }
+
+  /**
+   * 获取热门场景包
+   */
+  async getPopularScenePacks(limit: number = 10, days: number = 30): Promise<ScenePack[]> {
+    try {
+      // 调用数据库函数获取热门场景包
+      const { data, error } = await supabase.rpc('get_popular_scene_packs', {
+        p_limit: limit,
+        p_days: days,
+      });
+
+      if (error) {
+        console.error('获取热门场景包失败:', error);
+        // 降级：返回硬编码的前N个
+        return SCENE_PACKS.slice(0, limit);
+      }
+
+      if (!data || data.length === 0) {
+        // 没有统计数据，返回默认场景包
+        return SCENE_PACKS.slice(0, limit);
+      }
+
+      // 根据统计数据排序硬编码场景包
+      const scenePacksWithStats = SCENE_PACKS.map(pack => {
+        const stats = data.find((d: any) => d.scene_pack_id === pack.id);
+        return {
+          ...pack,
+          usageCount: stats?.usage_count || 0,
+          popularityScore: stats?.popularity_score || 0,
+        };
+      });
+
+      // 按热度排序
+      scenePacksWithStats.sort((a, b) => b.popularityScore - a.popularityScore);
+
+      return scenePacksWithStats.slice(0, limit);
+    } catch (error) {
+      console.error('获取热门场景包异常:', error);
+      return SCENE_PACKS.slice(0, limit);
     }
   }
 }
