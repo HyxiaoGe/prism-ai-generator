@@ -7,6 +7,7 @@ import {
   ModelSelector,
   SettingsTabs,
   ImageGrid,
+  GenerateButton,
 } from './features/ai-models';
 import { useAIGenerationStore } from './store/aiGenerationStore';
 import { useAuthStore } from './store/authStore';
@@ -43,6 +44,8 @@ function App() {
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
   const [galleryLoaded, setGalleryLoaded] = useState(false); // 标记画廊数据是否已加载
+  const [currentPrompt, setCurrentPrompt] = useState(''); // 当前输入的提示词（用于统一生成按钮）
+  const [isProcessing, setIsProcessing] = useState(false); // AI处理状态（分析、优化等）
 
   // Toast 通知系统
   const toast = useToast();
@@ -528,12 +531,23 @@ function App() {
             </div>
 
             {/* 可滚动内容区域 */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               <SettingsTabs
                 initialPrompt={sidebarPrompt}
                 suggestedTags={suggestedTags}
                 parsedFeatures={currentConfig.parsedFeatures}
                 disabled={currentGeneration.isGenerating}
+                onPromptChange={setCurrentPrompt}
+                onProcessingChange={setIsProcessing}
+              />
+            </div>
+
+            {/* 统一的生成按钮（固定底部） */}
+            <div className="flex-shrink-0">
+              <GenerateButton
+                prompt={currentPrompt}
+                disabled={currentGeneration.isGenerating}
+                isProcessing={isProcessing}
               />
             </div>
 

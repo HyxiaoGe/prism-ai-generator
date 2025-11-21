@@ -9,6 +9,8 @@ interface SettingsTabsProps {
   disabled?: boolean;
   suggestedTags?: any;
   parsedFeatures?: any; // 新增：解析出的特征信息
+  onPromptChange?: (prompt: string) => void; // 提示词变化回调
+  onProcessingChange?: (isProcessing: boolean) => void; // 处理状态变化回调
 }
 
 type TabId = 'model' | 'prompt' | 'advanced';
@@ -19,7 +21,14 @@ const tabs = [
   { id: 'advanced' as TabId, label: '高级选项', icon: Sliders },
 ];
 
-export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTags, parsedFeatures }: SettingsTabsProps) {
+export function SettingsTabs({
+  initialPrompt = '',
+  disabled = false,
+  suggestedTags,
+  parsedFeatures,
+  onPromptChange,
+  onProcessingChange
+}: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('model');
 
   return (
@@ -61,6 +70,8 @@ export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTa
             <GenerationModeSelector
               initialPrompt={initialPrompt}
               disabled={disabled}
+              onPromptChange={onPromptChange}
+              onProcessingChange={onProcessingChange}
             />
           </div>
         )}

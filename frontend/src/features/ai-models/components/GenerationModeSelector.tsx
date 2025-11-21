@@ -14,12 +14,16 @@ interface GenerationModeSelectorProps {
   onGenerate?: (config: GenerationConfig) => void;
   disabled?: boolean;
   initialPrompt?: string;
+  onPromptChange?: (prompt: string) => void;
+  onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 export function GenerationModeSelector({
   onGenerate,
   disabled = false,
-  initialPrompt = ''
+  initialPrompt = '',
+  onPromptChange,
+  onProcessingChange
 }: GenerationModeSelectorProps) {
   const [mode, setMode] = useState<GenerationMode>('quick');
 
@@ -56,7 +60,9 @@ export function GenerationModeSelector({
       {/* 内容区域 */}
       <div className="mode-content">
         {mode === 'quick' && (
-          <QuickModePanel />
+          <QuickModePanel
+            onPromptChange={onPromptChange}
+          />
         )}
 
         {mode === 'custom' && (
@@ -68,6 +74,8 @@ export function GenerationModeSelector({
             onGenerate={onGenerate}
             disabled={disabled}
             initialPrompt={initialPrompt}
+            onPromptChange={onPromptChange}
+            onProcessingChange={onProcessingChange}
           />
         )}
       </div>
@@ -170,11 +178,15 @@ function CustomStylePanel() {
 function AdvancedPanel({
   onGenerate,
   disabled,
-  initialPrompt
+  initialPrompt,
+  onPromptChange,
+  onProcessingChange
 }: {
   onGenerate?: (config: GenerationConfig) => void;
   disabled: boolean;
   initialPrompt: string;
+  onPromptChange?: (prompt: string) => void;
+  onProcessingChange?: (isProcessing: boolean) => void;
 }) {
   return (
     <div className="advanced-panel">
@@ -196,6 +208,8 @@ function AdvancedPanel({
         onGenerate={onGenerate}
         disabled={disabled}
         initialPrompt={initialPrompt}
+        onPromptChange={onPromptChange}
+        onProcessingChange={onProcessingChange}
       />
     </div>
   );
