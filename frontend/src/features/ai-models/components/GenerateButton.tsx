@@ -17,6 +17,12 @@ interface GenerateButtonProps {
   isProcessing?: boolean;
   /** 处理中的提示文本 */
   processingText?: string;
+  /** 当前所在的tab */
+  currentTab?: 'model' | 'prompt' | 'advanced';
+  /** 从首页选中的场景包ID */
+  selectedScenePackId?: string | null;
+  /** 点击下一步的回调 */
+  onNext?: () => void;
 }
 
 /**
@@ -27,7 +33,10 @@ export function GenerateButton({
   prompt = '',
   disabled = false,
   isProcessing = false,
-  processingText = '处理中...'
+  processingText = '处理中...',
+  currentTab = 'model',
+  selectedScenePackId = null,
+  onNext
 }: GenerateButtonProps) {
   const { startGeneration, currentConfig, currentGeneration } = useAIGenerationStore();
   const { appUser } = useAuthStore();
@@ -39,15 +48,26 @@ export function GenerateButton({
   // 构建完整提示词（基础提示词 + 标签）
   const fullPrompt = prompt.trim();
 
-  // 判断是否可以生成
-  const canGenerate = !disabled &&
-                      !isProcessing &&
-                      !currentGeneration.isGenerating &&
-                      hasQuota &&
-                      fullPrompt.length > 0;
+  // 判断是否显示"下一步"按钮（在模型配置tab且选中了场景包）
+  const isShowingNext = currentTab === 'model' && selectedScenePackId;
 
-  // 处理生成按钮点击
-  const handleGenerate = async () => {
+  // 判断是否可以点击按钮
+  const canClickButton = !disabled && !isProcessing && !currentGeneration.isGenerating;
+
+  // 判断是否可以生成（需要在提示词tab且有提示词）
+  const canGenerate = canClickButton && hasQuota && fullPrompt.length > 0;
+
+  // 处理按钮点击
+  const handleButtonClick = async () => {
+    if (!canClickButton) return;
+
+    // 如果在模型配置tab且选中了场景包，点击"下一步"
+    if (isShowingNext) {
+      onNext?.();
+      return;
+    }
+
+    // 否则执行生成逻辑
     if (!canGenerate) return;
 
     try {
@@ -76,6 +96,11 @@ export function GenerateButton({
   const getButtonText = () => {
     if (currentGeneration.isGenerating) return '正在生成...';
     if (isProcessing) return processingText;
+
+    // 如果在模型配置tab且选中了场景包，显示"下一步"
+    if (isShowingNext) return '下一步：配置提示词';
+
+    // 否则显示生成相关的文本
     if (!hasQuota) return '配额已用完';
     if (!fullPrompt) return '请输入提示词';
     return '🚀 开始生成';
@@ -135,13 +160,13 @@ export function GenerateButton({
 
         {/* 生成按钮 */}
         <button
-          onClick={handleGenerate}
-          disabled={!canGenerate}
+          onClick={handleButtonClick}
+          disabled={isShowingNext ? !canClickButton : !canGenerate}
           className={`
             w-full py-4 rounded-xl font-semibold text-lg
             transition-all duration-200
             flex items-center justify-center gap-2
-            ${canGenerate
+            ${(isShowingNext ? canClickButton : canGenerate)
               ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }
