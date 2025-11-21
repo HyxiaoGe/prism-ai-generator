@@ -45,7 +45,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Portrait Photography',
     icon: '👤',
     category: 'portrait',
-    preview: '/scene-packs/portrait.jpg',
+    preview: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=450&fit=crop',
     description: '专业人像照片，85mm镜头，浅景深，工作室灯光',
     difficulty: 'beginner',
     tags: {
@@ -71,7 +71,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Epic Landscape',
     icon: '🏔️',
     category: 'landscape',
-    preview: '/scene-packs/landscape.jpg',
+    preview: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=450&fit=crop',
     description: '壮丽自然风光，广角镜头，黄金时刻，电影级质感',
     difficulty: 'beginner',
     tags: {
@@ -99,7 +99,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Chinese Art',
     icon: '🎨',
     category: 'art',
-    preview: '/scene-packs/chinese.jpg',
+    preview: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800&h=450&fit=crop',
     description: '中国传统艺术风格，水墨质感，诗意氛围',
     difficulty: 'intermediate',
     tags: {
@@ -126,7 +126,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Cyberpunk',
     icon: '🤖',
     category: 'art',
-    preview: '/scene-packs/cyberpunk.jpg',
+    preview: 'https://images.unsplash.com/photo-1509043759401-136742328bb3?w=800&h=450&fit=crop',
     description: '未来科技感，霓虹灯效果，戏剧性灯光',
     difficulty: 'intermediate',
     tags: {
@@ -154,7 +154,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Product Photography',
     icon: '📦',
     category: 'product',
-    preview: '/scene-packs/product.jpg',
+    preview: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=450&fit=crop',
     description: '商业产品摄影，白色背景，专业灯光',
     difficulty: 'beginner',
     tags: {
@@ -180,7 +180,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Anime Character',
     icon: '🎭',
     category: 'art',
-    preview: '/scene-packs/anime.jpg',
+    preview: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&h=450&fit=crop',
     description: '日系动漫风格，明亮色彩，动态构图',
     difficulty: 'intermediate',
     tags: {
@@ -206,7 +206,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Classical Oil Painting',
     icon: '🖼️',
     category: 'art',
-    preview: '/scene-packs/oil-painting.jpg',
+    preview: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800&h=450&fit=crop',
     description: '欧洲古典油画风格，厚重质感，温暖色调',
     difficulty: 'advanced',
     tags: {
@@ -232,7 +232,7 @@ export const SCENE_PACKS: ScenePack[] = [
     nameEn: 'Modern Minimalist',
     icon: '⚪',
     category: 'design',
-    preview: '/scene-packs/minimalist.jpg',
+    preview: 'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=800&h=450&fit=crop',
     description: '现代简约风格，干净利落，留白设计',
     difficulty: 'beginner',
     tags: {
