@@ -24,6 +24,7 @@ INSERT INTO scene_templates (
   base_prompt,
   suggested_tags,
   thumbnail_url,
+  example_images,
   examples,
   tips,
   recommended_model,
@@ -53,6 +54,11 @@ INSERT INTO scene_templates (
     "enhancement": ["highly-detailed", "professional"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=800&fit=crop'
+  ],
   ARRAY['商务人士的职业照片', '优雅女性肖像', '阳光男性形象照'],
   '适合创作头像、简历照、社交媒体形象照',
   'flux-dev',
@@ -85,6 +91,11 @@ INSERT INTO scene_templates (
     "enhancement": ["highly-detailed", "hdr", "cinematic-quality"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=1200&h=675&fit=crop'
+  ],
   ARRAY['雪山日落壮景', '森林晨雾仙境', '海边惊涛骇浪'],
   '适合创作桌面壁纸、旅游风光、自然摄影',
   'flux-schnell',
@@ -116,6 +127,11 @@ INSERT INTO scene_templates (
     "enhancement": ["masterpiece", "highly-detailed"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1545486332-9e0999c535b2?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1524721696987-b9527df9e512?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1604869515882-4d10fa4b0492?w=600&h=800&fit=crop'
+  ],
   ARRAY['古装美人画像', '山水意境画', '水墨花鸟图'],
   '适合创作国风插画、传统艺术作品',
   'flux-dev',
@@ -148,6 +164,11 @@ INSERT INTO scene_templates (
     "enhancement": ["highly-detailed", "color-grading", "bloom"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1509043759401-136742328bb3?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=675&fit=crop'
+  ],
   ARRAY['未来都市夜景', '赛博女战士', '霓虹街道场景'],
   '适合创作科幻场景、游戏概念图',
   'flux-schnell',
@@ -178,6 +199,11 @@ INSERT INTO scene_templates (
     "enhancement": ["highly-detailed", "professional"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=800&fit=crop'
+  ],
   ARRAY['电子产品特写', '美妆产品展示', '食品摄影'],
   '适合电商产品图、广告素材',
   'flux-dev',
@@ -208,6 +234,11 @@ INSERT INTO scene_templates (
     "enhancement": ["highly-detailed", "color-grading"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1612538498613-d8a4e8c20ca3?w=600&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1606041011872-596597976b25?w=600&h=800&fit=crop'
+  ],
   ARRAY['少女角色立绘', '战斗场景', '日常生活场景'],
   '适合动漫角色设计、游戏立绘',
   'flux-schnell',
@@ -238,6 +269,11 @@ INSERT INTO scene_templates (
     "enhancement": ["masterpiece", "highly-detailed"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=1067&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1583225214464-9296029427aa?w=1067&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=1067&h=800&fit=crop'
+  ],
   ARRAY['贵族肖像', '静物写生', '宗教题材'],
   '适合艺术创作、古典风格作品',
   'flux-dev',
@@ -269,6 +305,11 @@ INSERT INTO scene_templates (
     "enhancement": ["professional"]
   }'::jsonb,
   'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=800&h=450&fit=crop',
+  ARRAY[
+    'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1449247666642-264389f5f5b1?w=1200&h=675&fit=crop',
+    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&h=675&fit=crop'
+  ],
   ARRAY['建筑空间', '产品设计', '抽象艺术'],
   '适合现代设计、品牌视觉',
   'flux-schnell',
@@ -293,6 +334,7 @@ DO UPDATE SET
   base_prompt = EXCLUDED.base_prompt,
   suggested_tags = EXCLUDED.suggested_tags,
   thumbnail_url = EXCLUDED.thumbnail_url,
+  example_images = EXCLUDED.example_images,
   examples = EXCLUDED.examples,
   tips = EXCLUDED.tips,
   recommended_model = EXCLUDED.recommended_model,
@@ -540,6 +582,180 @@ END;
 $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION get_user_scene_pack_history IS '获取用户的场景包使用历史';
+
+-- ============================================
+-- 3.4 搜索和筛选函数
+-- ============================================
+
+/**
+ * 搜索和筛选场景包
+ * 支持按名称、分类、难度、标签等多维度搜索
+ */
+CREATE OR REPLACE FUNCTION search_scene_packs(
+  p_search_text TEXT DEFAULT NULL,               -- 搜索关键词（搜索名称、描述）
+  p_category TEXT DEFAULT NULL,                   -- 分类筛选
+  p_difficulty TEXT DEFAULT NULL,                 -- 难度筛选
+  p_tags TEXT[] DEFAULT NULL,                     -- 标签筛选（任意匹配）
+  p_is_official BOOLEAN DEFAULT NULL,             -- 是否官方
+  p_sort_by TEXT DEFAULT 'popularity',            -- 排序方式：popularity, name, created_at, usage_count
+  p_limit INTEGER DEFAULT 20,                     -- 返回数量限制
+  p_offset INTEGER DEFAULT 0                      -- 偏移量（分页）
+)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  name_en TEXT,
+  icon TEXT,
+  category TEXT,
+  difficulty TEXT,
+  description TEXT,
+  thumbnail_url TEXT,
+  example_images TEXT[],
+  examples TEXT[],
+  tips TEXT,
+  recommended_model TEXT,
+  recommended_aspect_ratio TEXT,
+  recommended_steps INTEGER,
+  tags TEXT[],
+  usage_count BIGINT,
+  avg_rating NUMERIC,
+  is_official BOOLEAN
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH filtered_packs AS (
+    SELECT
+      st.id,
+      st.name,
+      st.name_en,
+      st.icon,
+      st.category,
+      st.difficulty,
+      st.description,
+      st.thumbnail_url,
+      st.example_images,
+      st.examples,
+      st.tips,
+      st.recommended_model,
+      st.recommended_aspect_ratio,
+      st.recommended_steps,
+      st.tags,
+      st.usage_count,
+      st.rating as avg_rating,
+      st.is_official,
+      st.created_at,
+      -- 计算匹配度得分（用于文本搜索排序）
+      CASE
+        WHEN p_search_text IS NOT NULL THEN
+          (
+            -- 名称匹配权重最高
+            (CASE WHEN st.name ILIKE '%' || p_search_text || '%' THEN 10 ELSE 0 END) +
+            (CASE WHEN st.name_en ILIKE '%' || p_search_text || '%' THEN 8 ELSE 0 END) +
+            -- 描述匹配权重中等
+            (CASE WHEN st.description ILIKE '%' || p_search_text || '%' THEN 5 ELSE 0 END) +
+            -- 标签匹配权重较低
+            (CASE WHEN EXISTS (
+              SELECT 1 FROM unnest(st.tags) t WHERE t ILIKE '%' || p_search_text || '%'
+            ) THEN 3 ELSE 0 END)
+          )
+        ELSE 0
+      END as search_score
+    FROM scene_templates st
+    WHERE
+      st.status = 'active'
+      -- 文本搜索过滤
+      AND (
+        p_search_text IS NULL
+        OR st.name ILIKE '%' || p_search_text || '%'
+        OR st.name_en ILIKE '%' || p_search_text || '%'
+        OR st.description ILIKE '%' || p_search_text || '%'
+        OR EXISTS (SELECT 1 FROM unnest(st.tags) t WHERE t ILIKE '%' || p_search_text || '%')
+      )
+      -- 分类过滤
+      AND (p_category IS NULL OR st.category = p_category)
+      -- 难度过滤
+      AND (p_difficulty IS NULL OR st.difficulty = p_difficulty)
+      -- 标签过滤（任意匹配）
+      AND (
+        p_tags IS NULL
+        OR st.tags && p_tags  -- 数组重叠操作符
+      )
+      -- 官方筛选
+      AND (p_is_official IS NULL OR st.is_official = p_is_official)
+  )
+  SELECT
+    fp.id,
+    fp.name,
+    fp.name_en,
+    fp.icon,
+    fp.category,
+    fp.difficulty,
+    fp.description,
+    fp.thumbnail_url,
+    fp.example_images,
+    fp.examples,
+    fp.tips,
+    fp.recommended_model,
+    fp.recommended_aspect_ratio,
+    fp.recommended_steps,
+    fp.tags,
+    fp.usage_count,
+    fp.avg_rating,
+    fp.is_official
+  FROM filtered_packs fp
+  ORDER BY
+    CASE p_sort_by
+      WHEN 'popularity' THEN fp.usage_count
+      WHEN 'usage_count' THEN fp.usage_count
+      ELSE 0
+    END DESC,
+    CASE p_sort_by
+      WHEN 'search_relevance' THEN fp.search_score
+      ELSE 0
+    END DESC,
+    CASE p_sort_by
+      WHEN 'name' THEN fp.name
+      ELSE ''
+    END ASC,
+    CASE p_sort_by
+      WHEN 'created_at' THEN fp.created_at
+      ELSE NULL
+    END DESC,
+    fp.name ASC  -- 默认二级排序
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+COMMENT ON FUNCTION search_scene_packs IS '搜索和筛选场景包，支持文本搜索、分类、难度、标签等多维度筛选';
+
+-- ============================================
+-- 3.5 获取场景包分类统计
+-- ============================================
+
+/**
+ * 获取各分类的场景包数量统计
+ */
+CREATE OR REPLACE FUNCTION get_scene_pack_category_stats()
+RETURNS TABLE (
+  category TEXT,
+  count BIGINT,
+  official_count BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    st.category,
+    COUNT(*)::BIGINT as count,
+    COUNT(*) FILTER (WHERE st.is_official = true)::BIGINT as official_count
+  FROM scene_templates st
+  WHERE st.status = 'active'
+  GROUP BY st.category
+  ORDER BY count DESC;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+COMMENT ON FUNCTION get_scene_pack_category_stats IS '获取各分类的场景包数量统计';
 
 -- ============================================
 -- 第四部分：权限和安全

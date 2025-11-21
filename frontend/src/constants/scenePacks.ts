@@ -33,6 +33,7 @@ export interface ScenePack {
 
   // 辅助信息
   examples: string[];            // 示例描述
+  exampleImages?: string[];      // 示例图片 URL 数组
   tips?: string;                 // 使用提示
   usageCount?: number;           // 使用次数（用于统计）
 }
@@ -63,6 +64,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '优雅女性肖像',
       '阳光男性形象照'
     ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=800&fit=crop'
+    ],
     tips: '适合创作头像、简历照、社交媒体形象照'
   },
 
@@ -91,6 +97,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '森林晨雾仙境',
       '海边惊涛骇浪'
     ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=1200&h=675&fit=crop'
+    ],
     tips: '适合创作桌面壁纸、旅游风光、自然摄影'
   },
 
@@ -117,6 +128,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '古装美人画像',
       '山水意境画',
       '水墨花鸟图'
+    ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1545486332-9e0999c535b2?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1524721696987-b9527df9e512?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1604869515882-4d10fa4b0492?w=600&h=800&fit=crop'
     ],
     tips: '适合创作国风插画、传统艺术作品'
   },
@@ -146,6 +162,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '赛博女战士',
       '霓虹街道场景'
     ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=675&fit=crop'
+    ],
     tips: '适合创作科幻场景、游戏概念图'
   },
 
@@ -171,6 +192,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '电子产品特写',
       '美妆产品展示',
       '食品摄影'
+    ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=800&fit=crop'
     ],
     tips: '适合电商产品图、广告素材'
   },
@@ -198,6 +224,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '战斗场景',
       '日常生活场景'
     ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1612538498613-d8a4e8c20ca3?w=600&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1606041011872-596597976b25?w=600&h=800&fit=crop'
+    ],
     tips: '适合动漫角色设计、游戏立绘'
   },
 
@@ -223,6 +254,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '贵族肖像',
       '静物写生',
       '宗教题材'
+    ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=1067&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1583225214464-9296029427aa?w=1067&h=800&fit=crop',
+      'https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=1067&h=800&fit=crop'
     ],
     tips: '适合艺术创作、古典风格作品'
   },
@@ -250,6 +286,11 @@ export const SCENE_PACKS: ScenePack[] = [
       '建筑空间',
       '产品设计',
       '抽象艺术'
+    ],
+    exampleImages: [
+      'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1449247666642-264389f5f5b1?w=1200&h=675&fit=crop',
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&h=675&fit=crop'
     ],
     tips: '适合现代设计、品牌视觉'
   }
