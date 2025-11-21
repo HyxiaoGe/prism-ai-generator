@@ -21,6 +21,8 @@ interface TemplateCardProps {
   onSelect: (template: SceneTemplate) => void;
   variant?: 'default' | 'compact' | 'featured';
   showStats?: boolean;
+  initialFavoriteStatus?: boolean; // 外部传入的收藏状态，避免重复查询
+  onFavoriteChange?: (templateId: string, isFavorited: boolean) => void; // 收藏状态变化回调
 }
 
 export function TemplateCard({
@@ -29,13 +31,22 @@ export function TemplateCard({
   onSelect,
   variant = 'default',
   showStats = true,
+  initialFavoriteStatus,
+  onFavoriteChange,
 }: TemplateCardProps) {
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(initialFavoriteStatus ?? false);
   const [isHovered, setIsHovered] = useState(false);
   const templateService = SceneTemplateService.getInstance();
 
-  // 检查是否已收藏
+  // 检查是否已收藏（只有在没有外部传入状态时才查询）
   useEffect(() => {
+    // 如果外部传入了收藏状态，直接使用，避免重复查询
+    if (initialFavoriteStatus !== undefined) {
+      setIsFavorited(initialFavoriteStatus);
+      return;
+    }
+
+    // 否则查询收藏状态
     const checkFavorite = async () => {
       try {
         const favorited = await templateService.isTemplateFavorited(template.id);
@@ -46,12 +57,13 @@ export function TemplateCard({
       }
     };
     checkFavorite();
-  }, [template.id]);
+  }, [template.id, initialFavoriteStatus]);
 
   // 切换收藏状态
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      const newFavoriteStatus = !isFavorited;
       if (isFavorited) {
         await templateService.unfavoriteTemplate(template.id);
         setIsFavorited(false);
@@ -59,6 +71,9 @@ export function TemplateCard({
         await templateService.favoriteTemplate(template.id);
         setIsFavorited(true);
       }
+
+      // 通知父组件收藏状态已改变
+      onFavoriteChange?.(template.id, newFavoriteStatus);
     } catch (error) {
       console.error('切换收藏状态失败:', error);
     }
