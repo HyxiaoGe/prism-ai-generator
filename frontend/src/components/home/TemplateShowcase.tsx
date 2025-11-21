@@ -23,16 +23,30 @@ export function TemplateShowcase({
 }: TemplateShowcaseProps) {
   // 状态管理
   const [loading, setLoading] = useState(true);
+  const [tabLoading, setTabLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [featuredTemplates, setFeaturedTemplates] = useState<SceneTemplate[]>([]);
   const [categorizedTemplates, setCategorizedTemplates] = useState<Map<string, SceneTemplate[]>>(new Map());
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [activeTab, setActiveTab] = useState<'popular' | 'rating' | 'newest'>('popular');
 
+  // 缓存三种排序的模板数据
+  const [cachedTemplates, setCachedTemplates] = useState<{
+    popular: SceneTemplate[];
+    rating: SceneTemplate[];
+    newest: SceneTemplate[];
+  }>({
+    popular: [],
+    rating: [],
+    newest: [],
+  });
+
   // 自动滚动相关状态
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const animationFrameRef = React.useRef<number | null>(null);
+  const scrollSpeedRef = React.useRef(0.5); // 每帧滚动像素数（调整可改变速度）
 
   const templateService = SceneTemplateService.getInstance();
 
@@ -41,39 +55,56 @@ export function TemplateShowcase({
     loadTemplates();
   }, []);
 
-  // 自动滚动效果
+  // 连续自动滚动效果（类似弹幕）
   useEffect(() => {
-    if (!isAutoScrolling || isPaused || !scrollContainerRef.current || featuredTemplates.length === 0) {
+    if (!isAutoScrolling || !scrollContainerRef.current || featuredTemplates.length === 0) {
       return;
     }
 
     const scrollContainer = scrollContainerRef.current;
-    const cardWidth = 320 + 24; // 卡片宽度(80*4) + gap(24px)
-    let scrollPosition = 0;
+    let lastTimestamp = 0;
 
-    const autoScroll = () => {
-      if (!scrollContainer || isPaused) return;
+    const smoothScroll = (timestamp: number) => {
+      if (!scrollContainer) return;
 
-      const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+      // 计算时间差（用于平滑滚动）
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const deltaTime = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
 
-      // 平滑滚动到下一个卡片
-      scrollPosition += cardWidth;
+      // 如果未暂停，继续滚动
+      if (!isPaused) {
+        const currentScroll = scrollContainer.scrollLeft;
+        const scrollWidth = scrollContainer.scrollWidth;
+        const clientWidth = scrollContainer.clientWidth;
 
-      // 如果到达末尾，重置到开始
-      if (scrollPosition >= maxScroll) {
-        scrollPosition = 0;
+        // 计算真实内容宽度（一半，因为我们复制了内容）
+        const halfWidth = (scrollWidth - clientWidth) / 2;
+
+        // 增加滚动位置
+        let newScroll = currentScroll + scrollSpeedRef.current;
+
+        // 无缝循环：当滚动到复制内容的一半时，重置到开始
+        if (newScroll >= halfWidth) {
+          newScroll = 0;
+        }
+
+        scrollContainer.scrollLeft = newScroll;
       }
 
-      scrollContainer.scrollTo({
-        left: scrollPosition,
-        behavior: 'smooth',
-      });
+      // 继续下一帧
+      animationFrameRef.current = requestAnimationFrame(smoothScroll);
     };
 
-    // 每5秒自动滚动一次
-    const interval = setInterval(autoScroll, 5000);
+    // 开始动画
+    animationFrameRef.current = requestAnimationFrame(smoothScroll);
 
-    return () => clearInterval(interval);
+    // 清理函数
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, [isAutoScrolling, isPaused, featuredTemplates]);
 
   // 加载模板数据
@@ -88,8 +119,24 @@ export function TemplateShowcase({
         templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED),
       ]);
 
+      console.log('加载的模板数据:', {
+        popular: popularTemplates.length,
+        rating: topRatedTemplates.length,
+        newest: latestTemplates.length,
+        popularIds: popularTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, usage: t.usage_count })),
+        ratingIds: topRatedTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, rating: t.rating })),
+        newestIds: latestTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, created: t.created_at })),
+      });
+
       // 设置分类数据
       setCategories(categoriesData);
+
+      // 缓存所有三种排序的数据
+      setCachedTemplates({
+        popular: popularTemplates,
+        rating: topRatedTemplates,
+        newest: latestTemplates,
+      });
 
       // 根据当前tab设置热门推荐
       switch (activeTab) {
@@ -150,23 +197,46 @@ export function TemplateShowcase({
 
   // 切换热门推荐tab
   const handleTabChange = async (tab: 'popular' | 'rating' | 'newest') => {
+    if (tab === activeTab) return; // 避免重复点击
+
     setActiveTab(tab);
+    setTabLoading(true);
+
     try {
       let templates: SceneTemplate[] = [];
-      switch (tab) {
-        case 'popular':
-          templates = await templateService.getPopularTemplates(DEFAULT_LIMITS.FEATURED);
-          break;
-        case 'rating':
-          templates = await templateService.getTopRatedTemplates(DEFAULT_LIMITS.FEATURED);
-          break;
-        case 'newest':
-          templates = await templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED);
-          break;
+
+      // 优先使用缓存数据
+      if (cachedTemplates[tab].length > 0) {
+        console.log(`使用缓存的 ${tab} 数据:`, cachedTemplates[tab].slice(0, 3).map(t => t.name));
+        templates = cachedTemplates[tab];
+      } else {
+        // 如果缓存为空，重新加载
+        console.log(`缓存为空，重新加载 ${tab} 数据`);
+        switch (tab) {
+          case 'popular':
+            templates = await templateService.getPopularTemplates(DEFAULT_LIMITS.FEATURED);
+            break;
+          case 'rating':
+            templates = await templateService.getTopRatedTemplates(DEFAULT_LIMITS.FEATURED);
+            break;
+          case 'newest':
+            templates = await templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED);
+            break;
+        }
+
+        // 更新缓存
+        setCachedTemplates(prev => ({
+          ...prev,
+          [tab]: templates,
+        }));
       }
+
+      console.log(`切换到 ${tab} tab，显示 ${templates.length} 个模板`);
       setFeaturedTemplates(templates);
     } catch (error) {
       console.error('切换tab失败:', error);
+    } finally {
+      setTabLoading(false);
     }
   };
 
@@ -246,16 +316,30 @@ export function TemplateShowcase({
           </div>
         </div>
 
-        {/* 横向滚动卡片 */}
+        {/* 横向滚动卡片 - 无限循环效果 */}
         <div className="relative group">
           <div
             ref={scrollContainerRef}
-            className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide"
+            className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide"
+            style={{ scrollBehavior: 'auto' }}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
+            {/* 原始内容 */}
             {featuredTemplates.map((template) => (
-              <div key={template.id} className="flex-shrink-0 w-80 snap-start">
+              <div key={`original-${template.id}`} className="flex-shrink-0 w-80">
+                <TemplateCard
+                  template={template}
+                  isSelected={selectedTemplateId === template.id}
+                  onSelect={onSelectTemplate}
+                  variant="featured"
+                  showStats={true}
+                />
+              </div>
+            ))}
+            {/* 复制内容（用于无缝循环） */}
+            {featuredTemplates.map((template) => (
+              <div key={`duplicate-${template.id}`} className="flex-shrink-0 w-80">
                 <TemplateCard
                   template={template}
                   isSelected={selectedTemplateId === template.id}
@@ -266,6 +350,16 @@ export function TemplateShowcase({
               </div>
             ))}
           </div>
+
+          {/* 加载遮罩 */}
+          {tabLoading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center rounded-xl z-10">
+              <div className="flex items-center gap-2 text-purple-600">
+                <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="font-medium">加载中...</span>
+              </div>
+            </div>
+          )}
 
           {/* 自动滚动指示器 */}
           <div className="absolute top-2 right-2 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
