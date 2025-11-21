@@ -51,10 +51,21 @@ export function GenerateButton({
     if (!canGenerate) return;
 
     try {
-      // 使用当前配置进行生成
+      // 使用当前配置进行生成，确保所有必填字段都有值
       await startGeneration({
-        ...currentConfig,
+        aspectRatio: currentConfig.aspectRatio || '1:1',
+        numOutputs: currentConfig.numOutputs || 4,
+        outputFormat: currentConfig.outputFormat || 'webp',
+        numInferenceSteps: currentConfig.numInferenceSteps || 4,
+        model: currentConfig.model || 'flux-schnell',
         prompt: fullPrompt,
+        // 可选字段
+        ...(currentConfig.seed !== undefined && { seed: currentConfig.seed }),
+        ...(currentConfig.width && { width: currentConfig.width }),
+        ...(currentConfig.height && { height: currentConfig.height }),
+        ...(currentConfig.steps && { steps: currentConfig.steps }),
+        ...(currentConfig.guidance && { guidance: currentConfig.guidance }),
+        ...(currentConfig.parsedFeatures && { parsedFeatures: currentConfig.parsedFeatures }),
       });
     } catch (error) {
       console.error('生成失败:', error);
