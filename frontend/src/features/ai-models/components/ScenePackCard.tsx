@@ -13,15 +13,29 @@ interface ScenePackCardProps {
 }
 
 export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps) {
+  // 根据难度等级获取边框颜色
+  const getDifficultyBorderColor = () => {
+    if (isSelected) {
+      return 'border-primary-500 shadow-md ring-4 ring-primary-100';
+    }
+    switch (pack.difficulty) {
+      case 'beginner':
+        return 'border-green-300 hover:border-green-400';
+      case 'intermediate':
+        return 'border-yellow-300 hover:border-yellow-400';
+      case 'advanced':
+        return 'border-red-300 hover:border-red-400';
+      default:
+        return 'border-gray-200 hover:border-gray-300';
+    }
+  };
+
   return (
     <div
       className={`
         scene-pack-card cursor-pointer rounded-lg overflow-hidden
         border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1
-        ${isSelected
-          ? 'border-primary-500 shadow-md ring-4 ring-primary-100'
-          : 'border-gray-200 hover:border-gray-300'
-        }
+        ${getDifficultyBorderColor()}
       `}
       onClick={onSelect}
     >
@@ -50,28 +64,6 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
           }}
         />
 
-        {/* 难度标签 - 优化样式，更明显 */}
-        <div className="absolute top-3 right-3 z-20">
-          <span className={`
-            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-            backdrop-blur-md shadow-lg border-2
-            ${pack.difficulty === 'beginner' ? 'bg-green-500/95 text-white border-green-300' : ''}
-            ${pack.difficulty === 'intermediate' ? 'bg-yellow-500/95 text-white border-yellow-300' : ''}
-            ${pack.difficulty === 'advanced' ? 'bg-red-500/95 text-white border-red-300' : ''}
-          `}>
-            <span className="text-sm">
-              {pack.difficulty === 'beginner' && '👋'}
-              {pack.difficulty === 'intermediate' && '⭐'}
-              {pack.difficulty === 'advanced' && '🔥'}
-            </span>
-            <span>
-              {pack.difficulty === 'beginner' && '新手'}
-              {pack.difficulty === 'intermediate' && '进阶'}
-              {pack.difficulty === 'advanced' && '专业'}
-            </span>
-          </span>
-        </div>
-
         {/* 选中指示器 */}
         {isSelected && (
           <div className="absolute inset-0 bg-primary-500 bg-opacity-20 flex items-center justify-center">
@@ -97,8 +89,21 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
         {/* 标题 */}
         <div className="flex items-center gap-2 mb-2">
           <span className="text-2xl">{pack.icon}</span>
-          <div>
-            <h4 className="font-semibold text-gray-900">{pack.name}</h4>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold text-gray-900">{pack.name}</h4>
+              {/* 难度徽章 */}
+              <span className={`
+                inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                ${pack.difficulty === 'beginner' ? 'bg-green-100 text-green-700' : ''}
+                ${pack.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' : ''}
+                ${pack.difficulty === 'advanced' ? 'bg-red-100 text-red-700' : ''}
+              `}>
+                {pack.difficulty === 'beginner' && '👋 新手'}
+                {pack.difficulty === 'intermediate' && '⭐ 进阶'}
+                {pack.difficulty === 'advanced' && '🔥 专业'}
+              </span>
+            </div>
             <p className="text-xs text-gray-500">{pack.nameEn}</p>
           </div>
         </div>
