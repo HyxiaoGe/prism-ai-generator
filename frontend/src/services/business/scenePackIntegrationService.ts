@@ -341,19 +341,6 @@ export class ScenePackIntegrationService {
     return SCENE_PACKS.filter(pack => pack.category === category);
   }
 
-  /**
-   * 搜索场景包（按名称或描述）
-   */
-  searchScenePacks(query: string): ScenePack[] {
-    const lowerQuery = query.toLowerCase();
-    return SCENE_PACKS.filter(
-      pack =>
-        pack.name.toLowerCase().includes(lowerQuery) ||
-        pack.nameEn.toLowerCase().includes(lowerQuery) ||
-        pack.description.toLowerCase().includes(lowerQuery)
-    );
-  }
-
   // ============================================
   // 统计功能（待实现）
   // ============================================
