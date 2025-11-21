@@ -27,33 +27,48 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
     >
       {/* 预览图区域 */}
       <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-        {/* 临时占位图 - 后续替换为真实预览图 */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* 临时占位图 - 仅在没有真实图片时显示 */}
+        <div className="absolute inset-0 flex items-center justify-center scene-pack-placeholder">
           <span className="text-6xl opacity-30">{pack.icon}</span>
         </div>
 
         <img
           src={pack.preview}
           alt={pack.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover relative z-10"
           loading="lazy"
+          onLoad={(e) => {
+            // 图片加载成功时隐藏占位符
+            const placeholder = e.currentTarget.parentElement?.querySelector('.scene-pack-placeholder');
+            if (placeholder) {
+              (placeholder as HTMLElement).style.display = 'none';
+            }
+          }}
           onError={(e) => {
-            // 图片加载失败时隐藏
+            // 图片加载失败时隐藏图片本身，显示占位符
             e.currentTarget.style.display = 'none';
           }}
         />
 
-        {/* 难度标签 */}
-        <div className="absolute top-2 right-2">
+        {/* 难度标签 - 优化样式，更明显 */}
+        <div className="absolute top-3 right-3 z-20">
           <span className={`
-            px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm
-            ${pack.difficulty === 'beginner' ? 'bg-green-100/90 text-green-700' : ''}
-            ${pack.difficulty === 'intermediate' ? 'bg-yellow-100/90 text-yellow-700' : ''}
-            ${pack.difficulty === 'advanced' ? 'bg-red-100/90 text-red-700' : ''}
+            inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+            backdrop-blur-md shadow-lg border-2
+            ${pack.difficulty === 'beginner' ? 'bg-green-500/95 text-white border-green-300' : ''}
+            ${pack.difficulty === 'intermediate' ? 'bg-yellow-500/95 text-white border-yellow-300' : ''}
+            ${pack.difficulty === 'advanced' ? 'bg-red-500/95 text-white border-red-300' : ''}
           `}>
-            {pack.difficulty === 'beginner' && '新手'}
-            {pack.difficulty === 'intermediate' && '进阶'}
-            {pack.difficulty === 'advanced' && '专业'}
+            <span className="text-sm">
+              {pack.difficulty === 'beginner' && '👋'}
+              {pack.difficulty === 'intermediate' && '⭐'}
+              {pack.difficulty === 'advanced' && '🔥'}
+            </span>
+            <span>
+              {pack.difficulty === 'beginner' && '新手'}
+              {pack.difficulty === 'intermediate' && '进阶'}
+              {pack.difficulty === 'advanced' && '专业'}
+            </span>
           </span>
         </div>
 

@@ -10,11 +10,13 @@ import { useAIGenerationStore } from '@/store/aiGenerationStore';
 
 interface QuickModePanelProps {
   onPackSelected?: (pack: ScenePack) => void;
+  onPromptChange?: (prompt: string) => void; // 提示词变化回调
 }
 
-export function QuickModePanel({ onPackSelected }: QuickModePanelProps) {
+export function QuickModePanel({ onPackSelected, onPromptChange }: QuickModePanelProps) {
   const [selectedPack, setSelectedPack] = useState<ScenePack | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [quickPrompt, setQuickPrompt] = useState<string>(''); // 快速模式的提示词
 
   const { updateConfig } = useAIGenerationStore();
 
@@ -23,6 +25,15 @@ export function QuickModePanel({ onPackSelected }: QuickModePanelProps) {
     setSelectedPack(pack);
     applyScenePack(pack);
     onPackSelected?.(pack);
+    // 清空提示词，让用户输入新的
+    setQuickPrompt('');
+    onPromptChange?.('');
+  };
+
+  // 处理提示词变化
+  const handlePromptChange = (value: string) => {
+    setQuickPrompt(value);
+    onPromptChange?.(value); // 通知父组件
   };
 
   // 应用场景包配置
@@ -220,12 +231,31 @@ export function QuickModePanel({ onPackSelected }: QuickModePanelProps) {
             )}
           </div>
 
+          {/* 🔥 新增：提示词输入区 */}
+          <div className="mt-6 space-y-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                📝 描述你想要的内容
+              </label>
+              <textarea
+                value={quickPrompt}
+                onChange={(e) => handlePromptChange(e.target.value)}
+                placeholder={`例如：${selectedPack.examples[0]}`}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none"
+                rows={3}
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                💡 提示：场景包参数已自动配置，你只需描述具体内容即可
+              </p>
+            </div>
+          </div>
+
           {/* 操作提示 */}
           <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
             <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
-            <span>已自动配置所有参数，现在可以在上方输入框中描述你想要的内容，然后点击生成按钮</span>
+            <span>已自动配置所有参数，输入描述后点击底部的生成按钮即可</span>
           </div>
         </div>
       )}

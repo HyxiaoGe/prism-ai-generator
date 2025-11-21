@@ -14,6 +14,7 @@ export { SettingsTabs } from './components/SettingsTabs';
 export { GenerationModeSelector } from './components/GenerationModeSelector';
 export { QuickModePanel } from './components/QuickModePanel';
 export { ScenePackCard } from './components/ScenePackCard';
+export { GenerateButton } from './components/GenerateButton';
 
 // 适配器系统
 export { AdapterManager } from './services/AdapterManager';

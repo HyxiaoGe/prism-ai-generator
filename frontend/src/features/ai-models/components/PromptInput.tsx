@@ -29,6 +29,8 @@ interface PromptInputProps {
   compact?: boolean;
   suggestedTags?: any;
   parsedFeatures?: any; // 新增：解析出的特征信息，用于自动选择标签
+  onPromptChange?: (prompt: string) => void; // 提示词变化回调
+  onProcessingChange?: (isProcessing: boolean) => void; // 处理状态变化回调
 }
 
 interface ParsedPromptResult {
@@ -43,7 +45,16 @@ interface ParsedPromptResult {
   fullOptimizedPrompt?: string; // 🔥 新增：保留完整的优化提示词
 }
 
-export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', compact = false, suggestedTags, parsedFeatures }: PromptInputProps) {
+export function PromptInput({
+  onGenerate,
+  disabled = false,
+  initialPrompt = '',
+  compact = false,
+  suggestedTags,
+  parsedFeatures,
+  onPromptChange,
+  onProcessingChange
+}: PromptInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -775,10 +786,25 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
   };
 
   const fullPrompt = getFullPrompt();
-  const hasEnhancements = selectedArtStyle || selectedThemeStyle || selectedMood || 
+  const hasEnhancements = selectedArtStyle || selectedThemeStyle || selectedMood ||
                          selectedEnhancements.length > 0 || selectedTechnical.length > 0 ||
-                         selectedComposition.length > 0 || // negative 已移除 || 
+                         selectedComposition.length > 0 || // negative 已移除 ||
                          isQualityEnhanced;
+
+  // 监听提示词变化，通知父组件
+  useEffect(() => {
+    if (onPromptChange) {
+      onPromptChange(fullPrompt);
+    }
+  }, [fullPrompt, onPromptChange]);
+
+  // 监听AI处理状态，通知父组件
+  useEffect(() => {
+    if (onProcessingChange) {
+      const isProcessing = aiState.isAnalyzing || aiState.isOptimizing || isTranslating;
+      onProcessingChange(isProcessing);
+    }
+  }, [aiState.isAnalyzing, aiState.isOptimizing, isTranslating, onProcessingChange]);
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
@@ -1081,69 +1107,7 @@ export function PromptInput({ onGenerate, disabled = false, initialPrompt = '', 
         />
       )}
 
-      {/* 配额状态显示 */}
-      {appUser && (
-        <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${
-                (appUser.daily_quota - appUser.used_today) > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-              }`}></div>
-              <span className="text-sm font-medium text-gray-700">今日配额</span>
-            </div>
-            <div className="text-right">
-              <span className={`text-lg font-bold ${
-                (appUser.daily_quota - appUser.used_today) > 0 ? 'text-blue-600' : 'text-red-600'
-              }`}>
-                {appUser.daily_quota - appUser.used_today}
-              </span>
-              <span className="text-gray-500 text-sm"> / {appUser.daily_quota}</span>
-            </div>
-          </div>
-          {(appUser.daily_quota - appUser.used_today) <= 0 && (
-            <div className="mt-2 text-xs text-red-600">
-              ⚠️ 今日配额已用完，明日凌晨自动重置
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 生成按钮 */}
-      <button
-        onClick={handleGenerate}
-        disabled={
-          !fullPrompt.trim() ||
-          disabled ||
-          aiState.isAnalyzing ||
-          aiState.isOptimizing ||
-          !!(appUser && (appUser.daily_quota - appUser.used_today) <= 0)
-        }
-        className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-medium rounded-xl transition-all duration-200 disabled:cursor-not-allowed"
-      >
-        {aiState.isAnalyzing ? (
-          <div className="flex items-center justify-center">
-            <svg className="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            AI分析中...
-          </div>
-        ) : aiState.isOptimizing ? (
-          <div className="flex items-center justify-center">
-            <svg className="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            AI优化中...
-          </div>
-        ) : (appUser && (appUser.daily_quota - appUser.used_today) <= 0) ? (
-          '配额已用完'
-        ) : (
-          '😊 开始生成'
-        )}
-      </button>
-
-      <div className="text-center text-xs text-gray-500">
-        提示：使用 Ctrl+Enter (Mac: Cmd+Enter) 快速生成
-      </div>
+      {/* 配额状态显示和生成按钮已移除 - 现在使用统一的底部GenerateButton */}
     </div>
   );
 } 
