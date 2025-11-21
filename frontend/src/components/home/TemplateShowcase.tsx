@@ -67,43 +67,50 @@ export function TemplateShowcase({
     const scrollContainer = scrollContainerRef.current;
     let lastTimestamp = 0;
 
-    const smoothScroll = (timestamp: number) => {
-      if (!scrollContainer) return;
+    // 添加一个小延迟，确保 DOM 完全渲染
+    const startDelay = setTimeout(() => {
+      const smoothScroll = (timestamp: number) => {
+        if (!scrollContainer) return;
 
-      // 计算时间差（用于平滑滚动）
-      if (!lastTimestamp) lastTimestamp = timestamp;
-      const deltaTime = timestamp - lastTimestamp;
-      lastTimestamp = timestamp;
+        // 计算时间差（用于平滑滚动）
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        const deltaTime = timestamp - lastTimestamp;
+        lastTimestamp = timestamp;
 
-      // 如果未暂停，继续滚动
-      if (!isPaused) {
-        const currentScroll = scrollContainer.scrollLeft;
-        const scrollWidth = scrollContainer.scrollWidth;
-        const clientWidth = scrollContainer.clientWidth;
+        // 如果未暂停，继续滚动
+        if (!isPaused) {
+          const currentScroll = scrollContainer.scrollLeft;
+          const scrollWidth = scrollContainer.scrollWidth;
+          const clientWidth = scrollContainer.clientWidth;
 
-        // 计算真实内容宽度（一半，因为我们复制了内容）
-        const halfWidth = (scrollWidth - clientWidth) / 2;
+          // 计算真实内容宽度（一半，因为我们复制了内容）
+          const halfWidth = (scrollWidth - clientWidth) / 2;
 
-        // 增加滚动位置
-        let newScroll = currentScroll + scrollSpeedRef.current;
+          // 只有当有可滚动内容时才执行滚动逻辑
+          if (halfWidth > 0) {
+            // 增加滚动位置
+            let newScroll = currentScroll + scrollSpeedRef.current;
 
-        // 无缝循环：当滚动到复制内容的一半时，重置到开始
-        if (newScroll >= halfWidth) {
-          newScroll = 0;
+            // 无缝循环：当滚动到复制内容的一半时，重置到开始
+            if (newScroll >= halfWidth) {
+              newScroll = 0;
+            }
+
+            scrollContainer.scrollLeft = newScroll;
+          }
         }
 
-        scrollContainer.scrollLeft = newScroll;
-      }
+        // 继续下一帧
+        animationFrameRef.current = requestAnimationFrame(smoothScroll);
+      };
 
-      // 继续下一帧
+      // 开始动画
       animationFrameRef.current = requestAnimationFrame(smoothScroll);
-    };
-
-    // 开始动画
-    animationFrameRef.current = requestAnimationFrame(smoothScroll);
+    }, 100); // 延迟100ms等待DOM渲染
 
     // 清理函数
     return () => {
+      clearTimeout(startDelay);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
