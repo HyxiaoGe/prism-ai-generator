@@ -302,6 +302,36 @@ export class SceneTemplateRepository extends BaseRepository {
   }
 
   /**
+   * 批量检查多个模板的收藏状态
+   */
+  async getFavoriteStatusMap(userId: string, templateIds: string[]): Promise<Map<string, boolean>> {
+    if (templateIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase
+      .from('user_template_favorites')
+      .select('template_id')
+      .eq('user_id', userId)
+      .in('template_id', templateIds);
+
+    if (error) {
+      console.error('批量检查收藏状态失败:', error);
+      return new Map();
+    }
+
+    // 创建一个 Map，标记哪些模板已收藏
+    const favoriteMap = new Map<string, boolean>();
+    const favoritedIds = new Set(data?.map(item => item.template_id) || []);
+
+    templateIds.forEach(id => {
+      favoriteMap.set(id, favoritedIds.has(id));
+    });
+
+    return favoriteMap;
+  }
+
+  /**
    * 获取用户收藏列表
    */
   async getFavorites(userId: string): Promise<SceneTemplate[]> {

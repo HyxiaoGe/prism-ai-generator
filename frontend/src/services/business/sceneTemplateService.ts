@@ -177,6 +177,21 @@ export class SceneTemplateService {
   }
 
   /**
+   * 批量获取模板的收藏状态
+   */
+  async getBatchFavoriteStatus(templateIds: string[]): Promise<Map<string, boolean>> {
+    const user = await this.authService.getAppUser();
+    if (!user) {
+      // 用户未登录，返回全部为 false 的 Map
+      const map = new Map<string, boolean>();
+      templateIds.forEach(id => map.set(id, false));
+      return map;
+    }
+
+    return this.templateRepository.getFavoriteStatusMap(user.id, templateIds);
+  }
+
+  /**
    * 获取用户收藏列表
    */
   async getUserFavorites(): Promise<SceneTemplate[]> {

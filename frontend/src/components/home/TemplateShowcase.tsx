@@ -41,12 +41,15 @@ export function TemplateShowcase({
     newest: [],
   });
 
+  // 收藏状态缓存
+  const [favoriteStatusMap, setFavoriteStatusMap] = useState<Map<string, boolean>>(new Map());
+
   // 自动滚动相关状态
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const animationFrameRef = React.useRef<number | null>(null);
-  const scrollSpeedRef = React.useRef(0.5); // 每帧滚动像素数（调整可改变速度）
+  const scrollSpeedRef = React.useRef(1.5); // 每帧滚动像素数（调整可改变速度）
 
   const templateService = SceneTemplateService.getInstance();
 
@@ -153,6 +156,16 @@ export function TemplateShowcase({
 
       // 按分类加载模板
       await loadCategorizedTemplates(categoriesData);
+
+      // 批量查询所有模板的收藏状态（一次性查询，避免N次请求）
+      const allTemplateIds = Array.from(new Set([
+        ...popularTemplates.map(t => t.id),
+        ...topRatedTemplates.map(t => t.id),
+        ...latestTemplates.map(t => t.id),
+      ]));
+
+      const favoriteMap = await templateService.getBatchFavoriteStatus(allTemplateIds);
+      setFavoriteStatusMap(favoriteMap);
     } catch (error) {
       console.error('加载模板失败:', error);
     } finally {
@@ -255,6 +268,15 @@ export function TemplateShowcase({
     }
   };
 
+  // 处理收藏状态变化
+  const handleFavoriteChange = (templateId: string, isFavorited: boolean) => {
+    setFavoriteStatusMap(prev => {
+      const newMap = new Map(prev);
+      newMap.set(templateId, isFavorited);
+      return newMap;
+    });
+  };
+
   // 处理查看全部
   const handleViewAll = (category: string) => {
     setSelectedCategory(category);
@@ -334,6 +356,8 @@ export function TemplateShowcase({
                   onSelect={onSelectTemplate}
                   variant="featured"
                   showStats={true}
+                  initialFavoriteStatus={favoriteStatusMap.get(template.id)}
+                  onFavoriteChange={handleFavoriteChange}
                 />
               </div>
             ))}
@@ -346,6 +370,8 @@ export function TemplateShowcase({
                   onSelect={onSelectTemplate}
                   variant="featured"
                   showStats={true}
+                  initialFavoriteStatus={favoriteStatusMap.get(template.id)}
+                  onFavoriteChange={handleFavoriteChange}
                 />
               </div>
             ))}
