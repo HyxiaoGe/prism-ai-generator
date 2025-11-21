@@ -22,6 +22,8 @@ interface CategorySectionProps {
   showViewAll?: boolean;
   onViewAll?: (category: string) => void;
   previewCount?: number;
+  favoriteStatusMap?: Map<string, boolean>; // 收藏状态缓存
+  onFavoriteChange?: (templateId: string, isFavorited: boolean) => void; // 收藏状态变化回调
 }
 
 export function CategorySection({
@@ -33,6 +35,8 @@ export function CategorySection({
   showViewAll = true,
   onViewAll,
   previewCount = 3,
+  favoriteStatusMap,
+  onFavoriteChange,
 }: CategorySectionProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
@@ -114,6 +118,8 @@ export function CategorySection({
             onSelect={onSelectTemplate}
             variant="default"
             showStats={true}
+            initialFavoriteStatus={favoriteStatusMap?.get(template.id)}
+            onFavoriteChange={onFavoriteChange}
           />
         ))}
       </div>
