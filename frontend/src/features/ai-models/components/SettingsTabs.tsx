@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Settings, Wand2, Sliders } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 import { PromptInput } from './PromptInput';
+import { GenerationModeSelector } from './GenerationModeSelector';
 
 interface SettingsTabsProps {
   initialPrompt?: string;
@@ -56,12 +57,10 @@ export function SettingsTabs({ initialPrompt = '', disabled = false, suggestedTa
 
         {activeTab === 'prompt' && (
           <div className="p-6">
-            <PromptInput 
+            {/* 使用新的场景包模式选择器 */}
+            <GenerationModeSelector
               initialPrompt={initialPrompt}
               disabled={disabled}
-              compact={true}
-              suggestedTags={suggestedTags}
-              parsedFeatures={parsedFeatures}
             />
           </div>
         )}
