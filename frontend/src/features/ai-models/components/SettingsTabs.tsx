@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Wand2, Sliders } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 import { PromptInput } from './PromptInput';
@@ -11,6 +11,7 @@ interface SettingsTabsProps {
   parsedFeatures?: any; // 新增：解析出的特征信息
   onPromptChange?: (prompt: string) => void; // 提示词变化回调
   onProcessingChange?: (isProcessing: boolean) => void; // 处理状态变化回调
+  selectedScenePackId?: string | null; // 从首页选中的场景包ID
 }
 
 type TabId = 'model' | 'prompt' | 'advanced';
@@ -27,9 +28,18 @@ export function SettingsTabs({
   suggestedTags,
   parsedFeatures,
   onPromptChange,
-  onProcessingChange
+  onProcessingChange,
+  selectedScenePackId
 }: SettingsTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('model');
+  // 如果从首页选择了场景包，自动切换到提示词tab，否则默认显示模型配置
+  const [activeTab, setActiveTab] = useState<TabId>(selectedScenePackId ? 'prompt' : 'model');
+
+  // 当selectedScenePackId变化时，自动切换到提示词tab
+  useEffect(() => {
+    if (selectedScenePackId) {
+      setActiveTab('prompt');
+    }
+  }, [selectedScenePackId]);
 
   return (
     <div className="flex flex-col h-full">
@@ -72,6 +82,7 @@ export function SettingsTabs({
               disabled={disabled}
               onPromptChange={onPromptChange}
               onProcessingChange={onProcessingChange}
+              selectedScenePackId={selectedScenePackId}
             />
           </div>
         )}

@@ -16,6 +16,7 @@ interface GenerationModeSelectorProps {
   initialPrompt?: string;
   onPromptChange?: (prompt: string) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
+  selectedScenePackId?: string | null; // 从首页选中的场景包ID
 }
 
 export function GenerationModeSelector({
@@ -23,7 +24,8 @@ export function GenerationModeSelector({
   disabled = false,
   initialPrompt = '',
   onPromptChange,
-  onProcessingChange
+  onProcessingChange,
+  selectedScenePackId
 }: GenerationModeSelectorProps) {
   const [mode, setMode] = useState<GenerationMode>('quick');
 
@@ -62,6 +64,7 @@ export function GenerationModeSelector({
         {mode === 'quick' && (
           <QuickModePanel
             onPromptChange={onPromptChange}
+            selectedScenePackId={selectedScenePackId}
           />
         )}
 
