@@ -12,3 +12,6 @@ export { ConfigService } from './configService';
 export { SceneTemplateService } from './sceneTemplateService';
 export type { TemplateBrowseOptions, TemplateRecommendation } from './sceneTemplateService';
 export { ScenePackIntegrationService, scenePackIntegration } from './scenePackIntegrationService';
+export type { ScenePackApplicationResult, ScenePackStats } from './scenePackIntegrationService';
+export { TagMappingService, tagMappingService } from './tagMappingService';
+export type { TagCategoryKey, ExpandedTag, TagExpansionResult } from './tagMappingService';

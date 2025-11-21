@@ -1,11 +1,41 @@
 /**
- * 场景包和模板集成服务
- * 打通场景包系统和数据库模板系统
+ * 场景包和模板集成服务（重构版）
+ *
+ * 主要改进：
+ * 1. 集成 TagMappingService，正确展开标签值
+ * 2. 完善场景包应用逻辑（包括所有推荐配置）
+ * 3. 统一场景包和数据库模板的处理流程
+ * 4. 添加详细的日志和错误处理
  */
 
 import { SCENE_PACKS, type ScenePack } from '@/constants/scenePacks';
-import { SceneTemplateService } from '@/services/business';
+import { SceneTemplateService } from './sceneTemplateService';
+import { tagMappingService, type TagExpansionResult } from './tagMappingService';
 import type { SceneTemplate } from '@/types/database';
+import type { GenerationConfig } from '@/types';
+
+/**
+ * 场景包应用结果
+ */
+export interface ScenePackApplicationResult {
+  basePrompt: string;           // 基础提示词
+  fullPrompt: string;           // 完整提示词（包含展开的标签）
+  suggestedTags: any;           // 推荐的标签配置（原始格式）
+  expandedTags: TagExpansionResult; // 展开后的标签详情
+  config: Partial<GenerationConfig>; // 完整的生成配置
+  warnings: string[];           // 警告信息
+  source: 'scene_pack' | 'database_template'; // 数据源
+}
+
+/**
+ * 场景包统计信息
+ */
+export interface ScenePackStats {
+  usageCount: number;
+  avgRating: number;
+  lastUsed?: Date;
+  favoritesCount?: number;
+}
 
 export class ScenePackIntegrationService {
   private static instance: ScenePackIntegrationService;
@@ -24,18 +54,221 @@ export class ScenePackIntegrationService {
 
   /**
    * 场景包到模板的映射关系
-   * 将硬编码的场景包与数据库模板关联
+   * 将硬编码的场景包与数据库模板分类关联
    */
   private scenePackTemplateMap: Record<string, string> = {
-    'portrait-photography': 'portrait', // 场景包ID -> 模板分类
+    'portrait-photography': 'portrait',
     'landscape-epic': 'landscape',
-    'chinese-style-art': 'chinese-style',
-    'cyberpunk-neon': 'cyberpunk',
+    'chinese-style-art': 'art',
+    'cyberpunk-neon': 'art',
     'product-commercial': 'product',
     'anime-character': 'anime',
-    'oil-painting-classic': 'oil-painting',
-    'modern-minimalist': 'minimalist',
+    'oil-painting-classic': 'art',
+    'modern-minimalist': 'design',
   };
+
+  // ============================================
+  // 核心应用逻辑
+  // ============================================
+
+  /**
+   * 统一应用场景包或模板（重构版）
+   *
+   * 主要改进：
+   * 1. 使用 TagMappingService 展开标签
+   * 2. 返回完整的生成配置
+   * 3. 提供详细的警告信息
+   */
+  async applyItem(item: ScenePack | SceneTemplate): Promise<ScenePackApplicationResult> {
+    if (this.isScenePack(item)) {
+      return this.applyScenePack(item);
+    } else {
+      return this.applyDatabaseTemplate(item);
+    }
+  }
+
+  /**
+   * 应用硬编码场景包
+   */
+  private applyScenePack(scenePack: ScenePack): ScenePackApplicationResult {
+    console.log('📦 应用场景包:', scenePack.name, scenePack.id);
+
+    // 1. 获取基础提示词（使用第一个示例）
+    const basePrompt = scenePack.examples[0] || '';
+
+    // 2. 使用 TagMappingService 展开标签
+    const expandedTags = tagMappingService.expandScenePackTags(scenePack.tags);
+
+    // 3. 构建完整提示词
+    const fullPrompt = tagMappingService.buildFullPrompt(
+      basePrompt,
+      scenePack.tags
+    );
+
+    // 4. 构建完整的生成配置
+    const config: Partial<GenerationConfig> = {
+      prompt: fullPrompt,
+      model: scenePack.recommendedModel,
+      aspectRatio: scenePack.recommendedAspectRatio,
+      numInferenceSteps: scenePack.recommendedSteps || this.getDefaultSteps(scenePack.recommendedModel),
+      outputFormat: 'webp', // 默认格式
+      numOutputs: 4,        // 默认数量
+
+      // 添加元数据用于追踪
+      scenePackId: scenePack.id,
+      scenePackName: scenePack.name,
+    };
+
+    // 5. 输出日志
+    console.log('✅ 场景包应用完成');
+    console.log('  - 基础提示词:', basePrompt);
+    console.log('  - 完整提示词:', fullPrompt);
+    console.log('  - 推荐模型:', config.model);
+    console.log('  - 推荐宽高比:', config.aspectRatio);
+    console.log('  - 推荐步数:', config.numInferenceSteps);
+
+    if (expandedTags.warnings.length > 0) {
+      console.warn('⚠️  标签映射警告:', expandedTags.warnings);
+    }
+
+    return {
+      basePrompt,
+      fullPrompt,
+      suggestedTags: scenePack.tags,
+      expandedTags,
+      config,
+      warnings: expandedTags.warnings,
+      source: 'scene_pack',
+    };
+  }
+
+  /**
+   * 应用数据库模板
+   */
+  private async applyDatabaseTemplate(template: SceneTemplate): Promise<ScenePackApplicationResult> {
+    console.log('💾 应用数据库模板:', template.name, template.id);
+
+    // 1. 使用模板服务应用模板（会记录使用历史）
+    const templateResult = await this.templateService.applyTemplate(template.id);
+
+    // 2. 展开数据库模板的标签（注意：数据库使用下划线命名）
+    const expandedTags = template.suggested_tags
+      ? tagMappingService.expandDatabaseTemplateTags(template.suggested_tags as any)
+      : { fullPrompt: '', expandedTags: [], warnings: [] };
+
+    // 3. 构建完整提示词
+    const fullPrompt = [templateResult.basePrompt, expandedTags.fullPrompt]
+      .filter(Boolean)
+      .join(', ');
+
+    // 4. 构建生成配置（从模板的推荐配置）
+    const config: Partial<GenerationConfig> = {
+      prompt: fullPrompt,
+      model: (template as any).recommended_model || 'flux-schnell',
+      aspectRatio: (template as any).recommended_aspect_ratio || '1:1',
+      numInferenceSteps: (template as any).recommended_steps || 4,
+      outputFormat: (template as any).recommended_output_format || 'webp',
+      numOutputs: (template as any).recommended_num_outputs || 4,
+
+      // 添加元数据
+      templateId: template.id,
+      templateName: template.name,
+    };
+
+    console.log('✅ 数据库模板应用完成');
+    console.log('  - 基础提示词:', templateResult.basePrompt);
+    console.log('  - 完整提示词:', fullPrompt);
+
+    return {
+      basePrompt: templateResult.basePrompt,
+      fullPrompt,
+      suggestedTags: template.suggested_tags || {},
+      expandedTags,
+      config,
+      warnings: expandedTags.warnings,
+      source: 'database_template',
+    };
+  }
+
+  /**
+   * 根据模型获取默认步数
+   */
+  private getDefaultSteps(modelId: string): number {
+    const stepsMap: Record<string, number> = {
+      'flux-schnell': 4,
+      'sdxl-lightning': 4,
+      'flux-dev': 28,
+      'stable-diffusion-xl': 20,
+    };
+    return stepsMap[modelId] || 4;
+  }
+
+  // ============================================
+  // 辅助功能
+  // ============================================
+
+  /**
+   * 判断是场景包还是模板
+   */
+  isScenePack(item: any): item is ScenePack {
+    return 'icon' in item && 'recommendedModel' in item && 'nameEn' in item;
+  }
+
+  /**
+   * 场景包转换为模板格式（用于统一展示）
+   */
+  scenePackToTemplate(scenePack: ScenePack): Partial<SceneTemplate> {
+    return {
+      id: `pack_${scenePack.id}`,
+      name: scenePack.name,
+      // @ts-ignore - 添加自定义字段
+      name_en: scenePack.nameEn,
+      // @ts-ignore
+      icon: scenePack.icon,
+      description: scenePack.description,
+      category: scenePack.category,
+      difficulty: scenePack.difficulty as any,
+      base_prompt: scenePack.examples[0] || '',
+
+      // 转换标签格式：单选转数组
+      suggested_tags: {
+        art_style: scenePack.tags.artStyle ? [scenePack.tags.artStyle] : undefined,
+        theme_style: scenePack.tags.themeStyle ? [scenePack.tags.themeStyle] : undefined,
+        mood: scenePack.tags.mood ? [scenePack.tags.mood] : undefined,
+        technical: scenePack.tags.technical,
+        composition: scenePack.tags.composition,
+        enhancement: scenePack.tags.enhancement,
+      },
+
+      thumbnail_url: scenePack.preview,
+      example_images: [],
+      // @ts-ignore - 添加自定义字段
+      examples: scenePack.examples,
+      // @ts-ignore
+      tips: scenePack.tips,
+
+      // 推荐配置
+      // @ts-ignore
+      recommended_model: scenePack.recommendedModel,
+      // @ts-ignore
+      recommended_aspect_ratio: scenePack.recommendedAspectRatio,
+      // @ts-ignore
+      recommended_steps: scenePack.recommendedSteps,
+
+      usage_count: scenePack.usageCount || 0,
+      rating: 0,
+      likes_count: 0,
+      is_official: true,
+      is_public: true,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // ============================================
+  // 查询和推荐
+  // ============================================
 
   /**
    * 从场景包ID获取推荐的数据库模板
@@ -47,7 +280,6 @@ export class ScenePackIntegrationService {
     }
 
     try {
-      // 从数据库加载该分类的热门模板
       const templates = await this.templateService.browseTemplates({
         category,
         sortBy: 'popular',
@@ -62,85 +294,23 @@ export class ScenePackIntegrationService {
   }
 
   /**
-   * 获取场景包的统计信息（从数据库）
-   */
-  async getScenePackStats(scenePackId: string): Promise<{
-    usageCount: number;
-    avgRating: number;
-    lastUsed?: Date;
-  }> {
-    // TODO: 实现场景包使用统计
-    // 可以创建新表 scene_pack_stats 或复用 scene_templates
-    return {
-      usageCount: 0,
-      avgRating: 0,
-    };
-  }
-
-  /**
-   * 记录场景包使用
-   */
-  async trackScenePackUsage(scenePackId: string, userId: string): Promise<void> {
-    try {
-      // TODO: 保存到数据库
-      console.log('📊 场景包使用统计:', { scenePackId, userId });
-
-      // 可以选择：
-      // 1. 创建新表 scene_pack_usage
-      // 2. 复用 user_events 表
-      // 3. 扩展 scene_templates 表
-    } catch (error) {
-      console.error('记录场景包使用失败:', error);
-    }
-  }
-
-  /**
-   * 将场景包转换为模板格式（用于统一展示）
-   */
-  scenePackToTemplate(scenePack: ScenePack): Partial<SceneTemplate> {
-    return {
-      id: `pack_${scenePack.id}`, // 添加前缀避免与真实模板冲突
-      name: scenePack.name,
-      description: scenePack.description,
-      category: scenePack.category,
-      difficulty: scenePack.difficulty as any,
-      base_prompt: scenePack.examples[0] || '',
-      suggested_tags: {
-        art_style: scenePack.tags.artStyle ? [scenePack.tags.artStyle] : undefined,
-        theme_style: scenePack.tags.themeStyle ? [scenePack.tags.themeStyle] : undefined,
-        mood: scenePack.tags.mood ? [scenePack.tags.mood] : undefined,
-        technical: scenePack.tags.technical,
-        composition: scenePack.tags.composition,
-        enhancement: scenePack.tags.enhancement,
-      },
-      thumbnail_url: scenePack.preview,
-      example_images: [], // 场景包暂无示例图
-      usage_count: scenePack.usageCount || 0,
-      rating: 0,
-      likes_count: 0,
-      is_official: true,
-      is_public: true,
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  }
-
-  /**
    * 获取首页推荐（混合场景包和数据库模板）
    */
   async getHomepageRecommendations(limit: number = 12): Promise<Array<ScenePack | SceneTemplate>> {
     try {
-      // 1. 获取场景包（前8个，因为是硬编码的精选）
+      // 1. 获取所有场景包（硬编码的精选内容）
       const scenePacks = SCENE_PACKS.slice(0, 8);
 
-      // 2. 获取数据库热门模板（补充到12个）
-      const templates = await this.templateService.browseTemplates({
-        sortBy: 'popular',
-        limit: limit - scenePacks.length,
-      });
+      // 2. 获取数据库热门模板作为补充
+      const remainingSlots = Math.max(0, limit - scenePacks.length);
+      const templates = remainingSlots > 0
+        ? await this.templateService.browseTemplates({
+            sortBy: 'popular',
+            limit: remainingSlots,
+          })
+        : [];
 
-      // 3. 混合展示（场景包优先，因为是精选的）
+      // 3. 混合展示（场景包优先）
       return [...scenePacks, ...templates];
     } catch (error) {
       console.error('获取首页推荐失败:', error);
@@ -150,35 +320,74 @@ export class ScenePackIntegrationService {
   }
 
   /**
-   * 判断是场景包还是模板
+   * 获取所有场景包
    */
-  isScenePack(item: any): item is ScenePack {
-    return 'icon' in item && 'recommendedModel' in item;
+  getAllScenePacks(): ScenePack[] {
+    return [...SCENE_PACKS];
   }
 
   /**
-   * 统一应用场景包或模板
+   * 根据ID获取场景包
    */
-  async applyItem(item: ScenePack | SceneTemplate): Promise<{
-    basePrompt: string;
-    suggestedTags: any;
-    config?: any;
-  }> {
-    if (this.isScenePack(item)) {
-      // 场景包：直接使用配置
-      return {
-        basePrompt: item.examples[0] || '',
-        suggestedTags: item.tags,
-        config: {
-          model: item.recommendedModel,
-          aspectRatio: item.recommendedAspectRatio,
-          numInferenceSteps: item.recommendedSteps,
-          scenePackId: item.id,
-        },
-      };
-    } else {
-      // 模板：使用现有的模板服务
-      return await this.templateService.applyTemplate(item.id);
+  getScenePackById(id: string): ScenePack | undefined {
+    return SCENE_PACKS.find(pack => pack.id === id);
+  }
+
+  /**
+   * 根据分类获取场景包
+   */
+  getScenePacksByCategory(category: ScenePack['category']): ScenePack[] {
+    return SCENE_PACKS.filter(pack => pack.category === category);
+  }
+
+  /**
+   * 搜索场景包（按名称或描述）
+   */
+  searchScenePacks(query: string): ScenePack[] {
+    const lowerQuery = query.toLowerCase();
+    return SCENE_PACKS.filter(
+      pack =>
+        pack.name.toLowerCase().includes(lowerQuery) ||
+        pack.nameEn.toLowerCase().includes(lowerQuery) ||
+        pack.description.toLowerCase().includes(lowerQuery)
+    );
+  }
+
+  // ============================================
+  // 统计功能（待实现）
+  // ============================================
+
+  /**
+   * 获取场景包的统计信息
+   * TODO: 需要实现数据库持久化
+   */
+  async getScenePackStats(scenePackId: string): Promise<ScenePackStats> {
+    // TODO: 从数据库查询
+    // 可以创建 scene_pack_usage 表或复用 template_usage_history
+    console.warn('⚠️  getScenePackStats 尚未实现数据库持久化');
+
+    return {
+      usageCount: 0,
+      avgRating: 0,
+    };
+  }
+
+  /**
+   * 记录场景包使用
+   * TODO: 需要实现数据库持久化
+   */
+  async trackScenePackUsage(scenePackId: string, userId: string): Promise<void> {
+    try {
+      // TODO: 保存到数据库
+      console.log('📊 场景包使用记录:', { scenePackId, userId, timestamp: new Date() });
+
+      // 可选方案：
+      // 1. 创建 scene_pack_usage 表
+      // 2. 复用 template_usage_history 表
+      // 3. 扩展 user_events 表
+
+    } catch (error) {
+      console.error('记录场景包使用失败:', error);
     }
   }
 }
