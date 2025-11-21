@@ -29,12 +29,52 @@ export function TemplateShowcase({
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [activeTab, setActiveTab] = useState<'popular' | 'rating' | 'newest'>('popular');
 
+  // 自动滚动相关状态
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
   const templateService = SceneTemplateService.getInstance();
 
   // 初始化加载数据
   useEffect(() => {
     loadTemplates();
   }, []);
+
+  // 自动滚动效果
+  useEffect(() => {
+    if (!isAutoScrolling || isPaused || !scrollContainerRef.current || featuredTemplates.length === 0) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    const cardWidth = 320 + 24; // 卡片宽度(80*4) + gap(24px)
+    let scrollPosition = 0;
+
+    const autoScroll = () => {
+      if (!scrollContainer || isPaused) return;
+
+      const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+
+      // 平滑滚动到下一个卡片
+      scrollPosition += cardWidth;
+
+      // 如果到达末尾，重置到开始
+      if (scrollPosition >= maxScroll) {
+        scrollPosition = 0;
+      }
+
+      scrollContainer.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth',
+      });
+    };
+
+    // 每5秒自动滚动一次
+    const interval = setInterval(autoScroll, 5000);
+
+    return () => clearInterval(interval);
+  }, [isAutoScrolling, isPaused, featuredTemplates]);
 
   // 加载模板数据
   const loadTemplates = async () => {
@@ -207,8 +247,13 @@ export function TemplateShowcase({
         </div>
 
         {/* 横向滚动卡片 */}
-        <div className="relative">
-          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+        <div className="relative group">
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
             {featuredTemplates.map((template) => (
               <div key={template.id} className="flex-shrink-0 w-80 snap-start">
                 <TemplateCard
@@ -220,6 +265,21 @@ export function TemplateShowcase({
                 />
               </div>
             ))}
+          </div>
+
+          {/* 自动滚动指示器 */}
+          <div className="absolute top-2 right-2 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            {isPaused ? (
+              <>
+                <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
+                <span>已暂停</span>
+              </>
+            ) : (
+              <>
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <span>自动轮播中</span>
+              </>
+            )}
           </div>
 
           {/* 左右渐变遮罩 */}
