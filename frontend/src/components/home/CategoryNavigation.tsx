@@ -33,6 +33,8 @@ export function CategoryNavigation({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
 
   // 检查滚动状态
   const checkScrollButtons = () => {
@@ -43,11 +45,63 @@ export function CategoryNavigation({
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
   };
 
+  // 统计主分类数量
+  const categoryMap = new Map<string, number>();
+  categories.forEach(cat => {
+    const count = categoryMap.get(cat.category) || 0;
+    categoryMap.set(cat.category, count + cat.count);
+  });
+
+  const mainCategories = Array.from(categoryMap.entries()).map(([category, count]) => ({
+    category,
+    count,
+  }));
+
   useEffect(() => {
     checkScrollButtons();
     window.addEventListener('resize', checkScrollButtons);
     return () => window.removeEventListener('resize', checkScrollButtons);
   }, [categories]);
+
+  // 自动滚动效果
+  useEffect(() => {
+    if (!isAutoScrolling || isPaused || !scrollContainerRef.current || mainCategories.length === 0) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    const buttonWidth = 180; // 估算每个分类按钮宽度
+    let scrollPosition = 0;
+
+    const autoScroll = () => {
+      if (!scrollContainer || isPaused) return;
+
+      const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+
+      if (maxScroll <= 0) return; // 如果内容不需要滚动，退出
+
+      // 平滑滚动到下一个位置
+      scrollPosition += buttonWidth;
+
+      // 如果到达末尾，重置到开始
+      if (scrollPosition >= maxScroll) {
+        scrollPosition = 0;
+      }
+
+      scrollContainer.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth',
+      });
+
+      // 更新滚动按钮状态
+      setTimeout(checkScrollButtons, 500);
+    };
+
+    // 每6秒自动滚动一次（比精选推荐慢一点，避免同时滚动）
+    const interval = setInterval(autoScroll, 6000);
+
+    return () => clearInterval(interval);
+  }, [isAutoScrolling, isPaused, mainCategories.length]);
 
   // 滚动函数
   const scroll = (direction: 'left' | 'right') => {
@@ -65,18 +119,6 @@ export function CategoryNavigation({
 
     setTimeout(checkScrollButtons, 300);
   };
-
-  // 统计主分类数量
-  const categoryMap = new Map<string, number>();
-  categories.forEach(cat => {
-    const count = categoryMap.get(cat.category) || 0;
-    categoryMap.set(cat.category, count + cat.count);
-  });
-
-  const mainCategories = Array.from(categoryMap.entries()).map(([category, count]) => ({
-    category,
-    count,
-  }));
 
   return (
     <div className="relative">
@@ -107,6 +149,8 @@ export function CategoryNavigation({
         <div
           ref={scrollContainerRef}
           onScroll={checkScrollButtons}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
           className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide scroll-smooth"
           style={{
             scrollbarWidth: 'none',
