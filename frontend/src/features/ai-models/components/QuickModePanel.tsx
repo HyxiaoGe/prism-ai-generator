@@ -3,7 +3,7 @@
  * 提供场景包选择，简化用户操作流程
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SCENE_PACKS, type ScenePack } from '@/constants/scenePacks';
 import { ScenePackCard } from './ScenePackCard';
 import { useAIGenerationStore } from '@/store/aiGenerationStore';
@@ -11,14 +11,25 @@ import { useAIGenerationStore } from '@/store/aiGenerationStore';
 interface QuickModePanelProps {
   onPackSelected?: (pack: ScenePack) => void;
   onPromptChange?: (prompt: string) => void; // 提示词变化回调
+  selectedScenePackId?: string | null; // 从首页选中的场景包ID
 }
 
-export function QuickModePanel({ onPackSelected, onPromptChange }: QuickModePanelProps) {
+export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePackId }: QuickModePanelProps) {
   const [selectedPack, setSelectedPack] = useState<ScenePack | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [quickPrompt, setQuickPrompt] = useState<string>(''); // 快速模式的提示词
 
   const { updateConfig } = useAIGenerationStore();
+
+  // 当从首页选择场景包时，自动选中对应的场景包
+  useEffect(() => {
+    if (selectedScenePackId && !selectedPack) {
+      const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
+      if (pack) {
+        handleSelectPack(pack);
+      }
+    }
+  }, [selectedScenePackId]);
 
   // 处理场景包选择
   const handleSelectPack = (pack: ScenePack) => {

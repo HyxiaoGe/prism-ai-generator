@@ -46,6 +46,7 @@ function App() {
   const [galleryLoaded, setGalleryLoaded] = useState(false); // 标记画廊数据是否已加载
   const [currentPrompt, setCurrentPrompt] = useState(''); // 当前输入的提示词（用于统一生成按钮）
   const [isProcessing, setIsProcessing] = useState(false); // AI处理状态（分析、优化等）
+  const [selectedScenePackId, setSelectedScenePackId] = useState<string | null>(null); // 从首页选中的场景包ID
 
   // Toast 通知系统
   const toast = useToast();
@@ -157,6 +158,11 @@ function App() {
       setSidebarPrompt(result.basePrompt);
       setSuggestedTags(result.suggestedTags);
 
+      // 保存选中的场景包ID（用于在快速模式中自动选中）
+      if (template.id) {
+        setSelectedScenePackId(template.id);
+      }
+
       // 应用完整的生成配置（包括模型、宽高比、步数等）
       const { updateConfig } = useAIGenerationStore.getState();
       updateConfig(result.config);
@@ -193,6 +199,7 @@ function App() {
   const handleFloatingButtonClick = () => {
     setSidebarPrompt(''); // 清空右侧栏提示词
     setSuggestedTags(null); // 清空推荐标签
+    setSelectedScenePackId(null); // 清空选中的场景包
     setShowSettings(!showSettings);
   };
 
@@ -539,6 +546,7 @@ function App() {
                 disabled={currentGeneration.isGenerating}
                 onPromptChange={setCurrentPrompt}
                 onProcessingChange={setIsProcessing}
+                selectedScenePackId={selectedScenePackId}
               />
             </div>
 
