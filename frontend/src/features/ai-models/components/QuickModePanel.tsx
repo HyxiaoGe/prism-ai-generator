@@ -23,13 +23,26 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
 
   // 当从首页选择场景包时，自动选中对应的场景包
   useEffect(() => {
-    if (selectedScenePackId && !selectedPack) {
+    if (selectedScenePackId) {
+      // 如果已经选中了这个场景包，不重复处理
+      if (selectedPack?.id === selectedScenePackId) {
+        return;
+      }
+
       const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
       if (pack) {
-        handleSelectPack(pack);
+        // 直接执行选中逻辑，避免依赖handleSelectPack
+        setSelectedPack(pack);
+        applyScenePack(pack);
+        onPackSelected?.(pack);
+
+        // 自动填充第一个示例作为默认提示词
+        const defaultPrompt = pack.examples[0] || '';
+        setQuickPrompt(defaultPrompt);
+        onPromptChange?.(defaultPrompt);
       }
     }
-  }, [selectedScenePackId]);
+  }, [selectedScenePackId, selectedPack?.id, onPackSelected, onPromptChange]);
 
   // 处理场景包选择
   const handleSelectPack = (pack: ScenePack) => {

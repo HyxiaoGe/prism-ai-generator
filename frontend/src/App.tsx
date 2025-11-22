@@ -203,6 +203,7 @@ function App() {
     setSidebarPrompt(''); // 清空右侧栏提示词
     setSuggestedTags(null); // 清空推荐标签
     setSelectedScenePackId(null); // 清空选中的场景包
+    setCurrentTab('model'); // 重置到模型配置tab
     setShowSettings(!showSettings);
   };
 
@@ -551,6 +552,7 @@ function App() {
                 onProcessingChange={setIsProcessing}
                 selectedScenePackId={selectedScenePackId}
                 onTabChange={setCurrentTab}
+                activeTab={currentTab}
               />
             </div>
 
