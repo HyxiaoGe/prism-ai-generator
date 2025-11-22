@@ -29,48 +29,42 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
       hasOnPromptChange: !!onPromptChange
     });
 
-    if (selectedScenePackId) {
-      const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
+    if (!selectedScenePackId) {
+      console.log('⏭️  没有selectedScenePackId，跳过');
+      return;
+    }
 
-      if (!pack) {
-        console.warn('⚠️  未找到场景包:', selectedScenePackId);
-        return;
-      }
+    const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
+    if (!pack) {
+      console.warn('⚠️  未找到场景包:', selectedScenePackId);
+      return;
+    }
 
-      console.log('✅ 找到场景包:', pack.name);
+    console.log('✅ 找到场景包:', pack.name);
 
-      // 如果场景包已经选中，只同步提示词
-      if (selectedPack?.id === selectedScenePackId) {
-        console.log('⏭️  场景包已选中，仅同步提示词');
-        const defaultPrompt = pack.examples[0] || '';
-        setQuickPrompt(defaultPrompt);
+    // 无条件设置选中状态和提示词（解决tab切换后组件重新挂载的问题）
+    console.log('🔄 设置场景包选中状态');
+    setSelectedPack(pack);
 
-        if (onPromptChange) {
-          console.log('📤 同步提示词到父组件');
-          onPromptChange(defaultPrompt);
-        }
-        return;
-      }
-
-      // 场景包未选中或变化了，完整应用配置
-      console.log('🔄 自动选中场景包并应用配置');
-      setSelectedPack(pack);
+    // 只在首次设置时应用配置（避免重复应用）
+    if (!selectedPack || selectedPack.id !== selectedScenePackId) {
+      console.log('🔄 应用场景包配置');
       applyScenePack(pack);
       onPackSelected?.(pack);
-
-      // 自动填充第一个示例作为默认提示词
-      const defaultPrompt = pack.examples[0] || '';
-      console.log('📝 设置默认提示词:', defaultPrompt);
-      setQuickPrompt(defaultPrompt);
-
-      if (onPromptChange) {
-        console.log('📤 调用onPromptChange');
-        onPromptChange(defaultPrompt);
-      } else {
-        console.warn('⚠️  onPromptChange未定义！');
-      }
     }
-  }, [selectedScenePackId]); // 移除selectedPack?.id依赖，避免循环
+
+    // 自动填充第一个示例作为默认提示词
+    const defaultPrompt = pack.examples[0] || '';
+    console.log('📝 设置默认提示词:', defaultPrompt);
+    setQuickPrompt(defaultPrompt);
+
+    if (onPromptChange) {
+      console.log('📤 调用onPromptChange');
+      onPromptChange(defaultPrompt);
+    } else {
+      console.warn('⚠️  onPromptChange未定义！');
+    }
+  }, [selectedScenePackId]); // 只依赖selectedScenePackId
 
   // 处理场景包选择
   const handleSelectPack = (pack: ScenePack) => {

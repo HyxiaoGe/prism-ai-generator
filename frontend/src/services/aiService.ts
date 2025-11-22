@@ -156,26 +156,6 @@ export class AIService {
         }
       },
       {
-        id: 'flux-dev',
-        name: 'Flux Dev',
-        description: '🎨 高质量生成，适合专业创作和精细作品',
-        provider: 'replicate' as const,
-        isEnabled: true,
-        costPerGeneration: 0.055,
-        tags: ['高质量', '专业'],
-        defaultConfig: {
-          aspectRatio: '1:1' as const,
-          numOutputs: 4,
-          outputFormat: 'webp' as const,
-          numInferenceSteps: 28,
-        },
-        capabilities: {
-          supportsAspectRatio: true,
-          maxSteps: 50,
-          supportedFormats: ['webp', 'jpg', 'png'] as ('webp' | 'jpg' | 'png')[],
-        }
-      },
-      {
         id: 'sdxl-lightning',
         name: 'SDXL Lightning',
         description: '⚡ 字节跳动出品，4步闪电生成，平衡速度与质量',

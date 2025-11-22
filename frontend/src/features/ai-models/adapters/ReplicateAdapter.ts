@@ -251,14 +251,7 @@ export class ReplicateAdapter extends BaseModelAdapter {
         // Flux Schnell优化配置
         processed.numInferenceSteps = Math.min(processed.numInferenceSteps, 4);
         break;
-        
-      case 'flux-dev':
-        // Flux Dev优化配置
-        if (processed.numInferenceSteps < 20) {
-          console.warn('Flux Dev建议使用20+步数以获得最佳质量');
-        }
-        break;
-        
+
       case 'sdxl-lightning':
         // SDXL Lightning优化配置
         processed.numInferenceSteps = Math.min(processed.numInferenceSteps, 8);

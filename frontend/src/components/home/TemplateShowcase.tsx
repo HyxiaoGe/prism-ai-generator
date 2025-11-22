@@ -73,67 +73,82 @@ export function TemplateShowcase({
     }
 
     let lastTimestamp = 0;
+    let animationId: number | null = null;
 
-    // 添加一个延迟，确保 DOM 完全渲染
-    const startDelay = setTimeout(() => {
-      const scrollContainer = scrollContainerRef.current;
+    // 使用 requestAnimationFrame 确保 DOM 已渲染，然后再延迟启动
+    const startScrolling = () => {
+      requestAnimationFrame(() => {
+        // 第一帧：检查 DOM
+        const scrollContainer = scrollContainerRef.current;
 
-      // 在延迟后检查 ref 是否存在
-      if (!scrollContainer) {
-        console.error('⚠️ 滚动容器未找到，DOM 可能还未渲染');
-        return;
-      }
-
-      console.log('✅ 开始启动滚动动画');
-
-      // 检查滚动容器的尺寸
-      const scrollWidth = scrollContainer.scrollWidth;
-      const clientWidth = scrollContainer.clientWidth;
-      console.log('📏 容器尺寸:', { scrollWidth, clientWidth, halfWidth: (scrollWidth - clientWidth) / 2 });
-
-      const smoothScroll = (timestamp: number) => {
-        if (!scrollContainer) return;
-
-        // 计算时间差（用于平滑滚动）
-        if (!lastTimestamp) lastTimestamp = timestamp;
-        const deltaTime = timestamp - lastTimestamp;
-        lastTimestamp = timestamp;
-
-        // 如果未暂停，继续滚动
-        if (!isPaused) {
-          const currentScroll = scrollContainer.scrollLeft;
-          const scrollWidth = scrollContainer.scrollWidth;
-          const clientWidth = scrollContainer.clientWidth;
-
-          // 计算真实内容宽度（一半，因为我们复制了内容）
-          const halfWidth = (scrollWidth - clientWidth) / 2;
-
-          // 只有当有可滚动内容时才执行滚动逻辑
-          if (halfWidth > 0) {
-            // 增加滚动位置
-            let newScroll = currentScroll + scrollSpeedRef.current;
-
-            // 无缝循环：当滚动到复制内容的一半时，重置到开始
-            if (newScroll >= halfWidth) {
-              newScroll = 0;
-            }
-
-            scrollContainer.scrollLeft = newScroll;
-          }
+        if (!scrollContainer) {
+          console.error('⚠️ 滚动容器未找到，1秒后重试');
+          // DOM 还没渲染，1秒后重试
+          setTimeout(startScrolling, 1000);
+          return;
         }
 
-        // 继续下一帧
-        animationFrameRef.current = requestAnimationFrame(smoothScroll);
-      };
+        console.log('✅ 找到滚动容器，准备启动滚动');
 
-      // 开始动画
-      animationFrameRef.current = requestAnimationFrame(smoothScroll);
-    }, 500); // 增加延迟到500ms
+        // 第二帧：等待布局稳定后启动
+        setTimeout(() => {
+          const scrollWidth = scrollContainer.scrollWidth;
+          const clientWidth = scrollContainer.clientWidth;
+          console.log('📏 容器尺寸:', { scrollWidth, clientWidth, halfWidth: (scrollWidth - clientWidth) / 2 });
+
+          const smoothScroll = (timestamp: number) => {
+            if (!scrollContainer) return;
+
+            // 计算时间差（用于平滑滚动）
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            // 如果未暂停，继续滚动
+            if (!isPaused) {
+              const currentScroll = scrollContainer.scrollLeft;
+              const scrollWidth = scrollContainer.scrollWidth;
+              const clientWidth = scrollContainer.clientWidth;
+
+              // 计算真实内容宽度（一半，因为我们复制了内容）
+              const halfWidth = (scrollWidth - clientWidth) / 2;
+
+              // 只有当有可滚动内容时才执行滚动逻辑
+              if (halfWidth > 0) {
+                // 增加滚动位置
+                let newScroll = currentScroll + scrollSpeedRef.current;
+
+                // 无缝循环：当滚动到复制内容的一半时，重置到开始
+                if (newScroll >= halfWidth) {
+                  newScroll = 0;
+                }
+
+                scrollContainer.scrollLeft = newScroll;
+              }
+            }
+
+            // 继续下一帧
+            animationId = requestAnimationFrame(smoothScroll);
+            animationFrameRef.current = animationId;
+          };
+
+          // 开始动画
+          console.log('🎬 启动滚动动画');
+          animationId = requestAnimationFrame(smoothScroll);
+          animationFrameRef.current = animationId;
+        }, 300); // 等待300ms让布局稳定
+      });
+    };
+
+    // 启动滚动
+    startScrolling();
 
     // 清理函数
     return () => {
       console.log('🧹 清理滚动动画');
-      clearTimeout(startDelay);
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }

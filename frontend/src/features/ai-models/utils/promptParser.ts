@@ -94,7 +94,6 @@ const ENHANCEMENT_MAP = new Map([
 // 模型标签映射 - 完整版本
 const MODEL_MAP = new Map([
   ['flux-schnell', { label: 'Flux快速', icon: '⚡', color: 'blue' }],
-  ['flux-dev', { label: 'Flux专业', icon: '🎯', color: 'purple' }],
   ['sdxl-lightning', { label: 'SDXL闪电', icon: '🌩️', color: 'yellow' }],
   ['sdxl-lightning-4step', { label: 'SDXL闪电4步', icon: '🌩️', color: 'yellow' }],
   ['stable-diffusion-xl', { label: 'SDXL经典', icon: '🏛️', color: 'gray' }],

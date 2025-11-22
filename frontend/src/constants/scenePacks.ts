@@ -56,9 +56,9 @@ export const SCENE_PACKS: ScenePack[] = [
       technical: ['85mm-lens', 'shallow-dof', 'studio-lighting'],
       enhancement: ['highly-detailed', 'professional']
     },
-    recommendedModel: 'flux-dev',
+    recommendedModel: 'flux-schnell',
     recommendedAspectRatio: '3:4',
-    recommendedSteps: 28,
+    recommendedSteps: 4,
     examples: [
       '商务人士的职业照片',
       '优雅女性肖像',
@@ -121,9 +121,9 @@ export const SCENE_PACKS: ScenePack[] = [
       composition: ['centered'],
       enhancement: ['masterpiece', 'highly-detailed']
     },
-    recommendedModel: 'flux-dev',
+    recommendedModel: 'flux-schnell',
     recommendedAspectRatio: '3:4',
-    recommendedSteps: 28,
+    recommendedSteps: 4,
     examples: [
       '古装美人画像',
       '山水意境画',
@@ -185,9 +185,9 @@ export const SCENE_PACKS: ScenePack[] = [
       composition: ['centered', 'minimalist'],
       enhancement: ['highly-detailed', 'professional']
     },
-    recommendedModel: 'flux-dev',
+    recommendedModel: 'flux-schnell',
     recommendedAspectRatio: '1:1',
-    recommendedSteps: 28,
+    recommendedSteps: 4,
     examples: [
       '电子产品特写',
       '美妆产品展示',
@@ -247,9 +247,9 @@ export const SCENE_PACKS: ScenePack[] = [
       composition: ['centered'],
       enhancement: ['masterpiece', 'highly-detailed']
     },
-    recommendedModel: 'flux-dev',
+    recommendedModel: 'flux-schnell',
     recommendedAspectRatio: '4:3',
-    recommendedSteps: 28,
+    recommendedSteps: 4,
     examples: [
       '贵族肖像',
       '静物写生',
