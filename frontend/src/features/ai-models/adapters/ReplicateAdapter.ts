@@ -252,9 +252,9 @@ export class ReplicateAdapter extends BaseModelAdapter {
         processed.numInferenceSteps = Math.min(processed.numInferenceSteps, 4);
         break;
 
-      case 'sdxl-lightning':
-        // SDXL Lightning优化配置
-        processed.numInferenceSteps = Math.min(processed.numInferenceSteps, 8);
+      case 'nano-banana':
+        // Nano Banana优化配置（如需要特殊处理）
+        // 保持默认配置即可
         break;
     }
 
