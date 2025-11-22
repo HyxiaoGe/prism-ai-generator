@@ -52,6 +52,16 @@ function App() {
   // Toast 通知系统
   const toast = useToast();
 
+  // 调试：监控currentPrompt变化
+  useEffect(() => {
+    console.log('📊 App.tsx - currentPrompt changed:', currentPrompt);
+  }, [currentPrompt]);
+
+  // 调试：监控currentTab变化
+  useEffect(() => {
+    console.log('📊 App.tsx - currentTab changed:', currentTab);
+  }, [currentTab]);
+
   // 认证状态
   const {
     initialize: initializeAuth,
@@ -151,13 +161,25 @@ function App() {
 
   // 处理模板点击（支持场景包、数据库模板、硬编码模板）
   const handleTemplateClick = async (template: any | SceneTemplate) => {
-    // 立即打开设置面板，避免卡顿
-    setShowSettings(true);
+    console.log('🎯 handleTemplateClick called:', template.id || template.name);
+
+    // 重置tab到模型配置（确保每次都从模型配置开始）
+    console.log('🔄 重置tab到model');
+    setCurrentTab('model');
+
+    // 清空之前的提示词状态
+    console.log('🔄 清空currentPrompt');
+    setCurrentPrompt('');
 
     // 保存选中的场景包ID（用于在快速模式中自动选中）
     if (template.id) {
+      console.log('🔄 设置selectedScenePackId:', template.id);
       setSelectedScenePackId(template.id);
     }
+
+    // 立即打开设置面板，避免卡顿
+    console.log('🔄 打开设置面板');
+    setShowSettings(true);
 
     // 异步处理其他逻辑
     try {
