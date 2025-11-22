@@ -39,7 +39,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
 
       console.log('✅ 找到场景包:', pack.name);
 
-      // 如果场景包没变化，只同步提示词（不重复应用配置）
+      // 如果场景包已经选中，只同步提示词
       if (selectedPack?.id === selectedScenePackId) {
         console.log('⏭️  场景包已选中，仅同步提示词');
         const defaultPrompt = pack.examples[0] || '';
@@ -52,8 +52,8 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
         return;
       }
 
-      // 场景包变化了，完整应用配置
-      console.log('🔄 场景包变化，完整应用配置');
+      // 场景包未选中或变化了，完整应用配置
+      console.log('🔄 自动选中场景包并应用配置');
       setSelectedPack(pack);
       applyScenePack(pack);
       onPackSelected?.(pack);
@@ -70,7 +70,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
         console.warn('⚠️  onPromptChange未定义！');
       }
     }
-  }, [selectedScenePackId, selectedPack?.id, onPackSelected, onPromptChange]);
+  }, [selectedScenePackId]); // 移除selectedPack?.id依赖，避免循环
 
   // 处理场景包选择
   const handleSelectPack = (pack: ScenePack) => {

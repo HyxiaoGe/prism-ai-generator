@@ -5,7 +5,14 @@
 
 // 分类图标映射
 export const CATEGORY_ICONS: Record<string, string> = {
+  // 中文分类
   '摄影艺术': '📷',
+
+  // 英文分类（数据库中的值）
+  'portrait': '👤',
+  'landscape': '🏔️',
+  'product': '📦',
+  'food': '🍽️',
   'anime': '🎌',
   'game': '🎮',
   'painting': '🎨',
@@ -17,11 +24,26 @@ export const CATEGORY_ICONS: Record<string, string> = {
   'dieselpunk': '🔧',
   'nature': '🌿',
   'architecture': '🏛️',
+  'abstract': '🌀',
+  'fantasy': '🧙',
+  'scifi': '🚀',
+  'realistic': '📸',
+  'minimalist': '⬜',
+  'vintage': '📻',
+  'modern': '🏙️',
+  'all': '🌟',
 };
 
 // 分类中文名称映射
 export const CATEGORY_LABELS: Record<string, string> = {
+  // 中文分类
   '摄影艺术': '摄影艺术',
+
+  // 英文分类（数据库中的值）
+  'portrait': '人像摄影',
+  'landscape': '风景摄影',
+  'product': '产品摄影',
+  'food': '美食摄影',
   'anime': '日系动漫',
   'game': '游戏风格',
   'painting': '绘画艺术',
@@ -33,12 +55,26 @@ export const CATEGORY_LABELS: Record<string, string> = {
   'dieselpunk': '柴油朋克',
   'nature': '自然生态',
   'architecture': '建筑设计',
+  'abstract': '抽象艺术',
+  'fantasy': '奇幻风格',
+  'scifi': '科幻风格',
+  'realistic': '写实风格',
+  'minimalist': '极简主义',
+  'vintage': '复古风格',
+  'modern': '现代风格',
   'all': '全部模板',
 };
 
 // 分类描述
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  // 中文分类
   '摄影艺术': '专业摄影风格，工作室级质量',
+
+  // 英文分类（数据库中的值）
+  'portrait': '人像摄影风格，专业肖像和人物拍摄',
+  'landscape': '风景摄影风格，壮丽自然与城市景观',
+  'product': '产品摄影风格，商业产品展示',
+  'food': '美食摄影风格，诱人食物拍摄',
   'anime': '日本动漫风格，充满活力',
   'game': '游戏场景和角色设计',
   'painting': '传统和数字绘画艺术',
@@ -50,11 +86,25 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'dieselpunk': '二战工业风格',
   'nature': '自然风光和生物摄影',
   'architecture': '建筑和空间设计',
+  'abstract': '抽象艺术风格，创意表现',
+  'fantasy': '奇幻风格，魔法与神秘',
+  'scifi': '科幻风格，未来科技感',
+  'realistic': '写实风格，高度逼真',
+  'minimalist': '极简主义，简约美学',
+  'vintage': '复古风格，怀旧氛围',
+  'modern': '现代风格，时尚前卫',
 };
 
 // 分类渐变色背景（用于缩略图占位符）
 export const CATEGORY_GRADIENTS: Record<string, string> = {
+  // 中文分类
   '摄影艺术': 'from-blue-400 via-indigo-500 to-purple-600',
+
+  // 英文分类（数据库中的值）
+  'portrait': 'from-blue-400 via-indigo-500 to-purple-600',
+  'landscape': 'from-green-400 via-emerald-500 to-teal-600',
+  'product': 'from-orange-400 via-amber-500 to-yellow-600',
+  'food': 'from-red-400 via-orange-500 to-yellow-600',
   'anime': 'from-pink-400 via-rose-500 to-red-600',
   'game': 'from-green-400 via-teal-500 to-cyan-600',
   'painting': 'from-orange-400 via-amber-500 to-yellow-600',
@@ -66,6 +116,13 @@ export const CATEGORY_GRADIENTS: Record<string, string> = {
   'dieselpunk': 'from-slate-600 via-gray-700 to-zinc-800',
   'nature': 'from-green-500 via-emerald-600 to-teal-700',
   'architecture': 'from-slate-400 via-gray-500 to-zinc-600',
+  'abstract': 'from-purple-500 via-pink-600 to-red-700',
+  'fantasy': 'from-violet-500 via-purple-600 to-indigo-700',
+  'scifi': 'from-cyan-500 via-blue-600 to-indigo-700',
+  'realistic': 'from-gray-500 via-slate-600 to-zinc-700',
+  'minimalist': 'from-gray-300 via-gray-400 to-gray-500',
+  'vintage': 'from-yellow-600 via-orange-700 to-brown-800',
+  'modern': 'from-indigo-500 via-purple-600 to-pink-700',
 };
 
 // 难度标签映射
