@@ -198,7 +198,6 @@ export class ScenePackIntegrationService {
     const stepsMap: Record<string, number> = {
       'flux-schnell': 4,
       'sdxl-lightning': 4,
-      'flux-dev': 28,
       'stable-diffusion-xl': 20,
     };
     return stepsMap[modelId] || 4;
