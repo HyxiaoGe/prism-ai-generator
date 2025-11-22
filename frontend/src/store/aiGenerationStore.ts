@@ -294,7 +294,7 @@ export const useAIGenerationStore = create<AIGenerationState>()(
         ),
 
       clearHistory: () =>
-        set({ generationHistory: [] }, false, 'clearHistory'),
+        set({ generationHistory: [], generationBatches: [] }, false, 'clearHistory'),
 
       removeFromHistory: (id) =>
         set(
