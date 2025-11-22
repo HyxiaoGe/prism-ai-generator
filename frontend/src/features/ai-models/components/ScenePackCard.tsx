@@ -1,13 +1,15 @@
 /**
  * 场景包卡片组件
- * 用于展示和选择场景包
+ * 用于展示和选择场景包（支持数据库SceneTemplate）
+ *
+ * 重构说明：从硬编码ScenePack改为数据库SceneTemplate类型
  */
 
 import React from 'react';
-import type { ScenePack } from '@/constants/scenePacks';
+import type { SceneTemplate } from '@/types/database';
 
 interface ScenePackCardProps {
-  pack: ScenePack;
+  pack: SceneTemplate;
   isSelected: boolean;
   onSelect: () => void;
 }
@@ -43,11 +45,11 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
       <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
         {/* 临时占位图 - 仅在没有真实图片时显示 */}
         <div className="absolute inset-0 flex items-center justify-center scene-pack-placeholder">
-          <span className="text-6xl opacity-30">{pack.icon}</span>
+          <span className="text-6xl opacity-30">{pack.icon || '🎨'}</span>
         </div>
 
         <img
-          src={pack.preview}
+          src={pack.thumbnail_url || ''}
           alt={pack.name}
           className="w-full h-full object-cover relative z-10"
           loading="lazy"
@@ -88,7 +90,7 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
       <div className="p-4">
         {/* 标题 */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-2xl">{pack.icon}</span>
+          <span className="text-2xl">{pack.icon || '🎨'}</span>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h4 className="font-semibold text-gray-900">{pack.name}</h4>
@@ -104,28 +106,30 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
                 {pack.difficulty === 'advanced' && '🔥 专业'}
               </span>
             </div>
-            <p className="text-xs text-gray-500">{pack.nameEn}</p>
+            {pack.name_en && (
+              <p className="text-xs text-gray-500">{pack.name_en}</p>
+            )}
           </div>
         </div>
 
         {/* 描述 */}
         <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-          {pack.description}
+          {pack.description || pack.base_prompt}
         </p>
 
-        {/* 标签预览 */}
+        {/* 标签预览（适配数据库suggested_tags结构） */}
         <div className="flex flex-wrap gap-1">
-          {pack.tags.artStyle && (
+          {pack.suggested_tags?.art_style?.[0] && (
             <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
-              {getTagDisplayName(pack.tags.artStyle, 'artStyle')}
+              {getTagDisplayName(pack.suggested_tags.art_style[0], 'artStyle')}
             </span>
           )}
-          {pack.tags.mood && (
+          {pack.suggested_tags?.mood?.[0] && (
             <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
-              {getTagDisplayName(pack.tags.mood, 'mood')}
+              {getTagDisplayName(pack.suggested_tags.mood[0], 'mood')}
             </span>
           )}
-          {pack.tags.technical?.slice(0, 2).map(tag => (
+          {pack.suggested_tags?.technical?.slice(0, 2).map(tag => (
             <span
               key={tag}
               className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded"
@@ -133,9 +137,9 @@ export function ScenePackCard({ pack, isSelected, onSelect }: ScenePackCardProps
               {getTagDisplayName(tag, 'technical')}
             </span>
           ))}
-          {pack.tags.technical && pack.tags.technical.length > 2 && (
+          {pack.suggested_tags?.technical && pack.suggested_tags.technical.length > 2 && (
             <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-              +{pack.tags.technical.length - 2}
+              +{pack.suggested_tags.technical.length - 2}
             </span>
           )}
         </div>

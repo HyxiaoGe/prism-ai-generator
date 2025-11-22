@@ -1,42 +1,80 @@
 /**
  * 快速模式面板
  * 提供场景包选择，简化用户操作流程
+ *
+ * 重构说明：从硬编码SCENE_PACKS改为从数据库加载，解决UUID不匹配问题
  */
 
 import React, { useState, useEffect } from 'react';
-import { SCENE_PACKS, type ScenePack } from '@/constants/scenePacks';
 import { ScenePackCard } from './ScenePackCard';
 import { useAIGenerationStore } from '@/store/aiGenerationStore';
+import { SceneTemplateService } from '@/services/business/sceneTemplateService';
+import type { SceneTemplate } from '@/types/database';
 
 interface QuickModePanelProps {
-  onPackSelected?: (pack: ScenePack) => void;
+  onPackSelected?: (pack: SceneTemplate) => void;
   onPromptChange?: (prompt: string) => void; // 提示词变化回调
-  selectedScenePackId?: string | null; // 从首页选中的场景包ID
+  selectedScenePackId?: string | null; // 从首页选中的场景包ID（UUID格式）
 }
 
 export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePackId }: QuickModePanelProps) {
-  const [selectedPack, setSelectedPack] = useState<ScenePack | null>(null);
+  const [selectedPack, setSelectedPack] = useState<SceneTemplate | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [quickPrompt, setQuickPrompt] = useState<string>(''); // 快速模式的提示词
+  const [scenePacks, setScenePacks] = useState<SceneTemplate[]>([]); // 从数据库加载的场景包
+  const [isLoading, setIsLoading] = useState(true); // 加载状态
 
   const { updateConfig } = useAIGenerationStore();
+  const sceneTemplateService = SceneTemplateService.getInstance();
+
+  // 从数据库加载官方场景包
+  useEffect(() => {
+    const loadScenePacks = async () => {
+      try {
+        setIsLoading(true);
+        const templates = await sceneTemplateService.browseTemplates({
+          isOfficial: true,
+          sortBy: 'popular',
+          limit: 50,
+        });
+        setScenePacks(templates);
+        console.log('✅ 成功从数据库加载场景包:', templates.length, '个');
+      } catch (error) {
+        console.error('❌ 加载场景包失败:', error);
+        setScenePacks([]); // 加载失败时使用空数组
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadScenePacks();
+  }, []);
 
   // 当从首页选择场景包时，自动选中对应的场景包
   useEffect(() => {
     console.log('🔍 QuickModePanel useEffect triggered:', {
       selectedScenePackId,
       selectedPackId: selectedPack?.id,
+      scenePacksLoaded: scenePacks.length,
       hasOnPromptChange: !!onPromptChange
     });
+
+    // 等待场景包加载完成
+    if (scenePacks.length === 0 || isLoading) {
+      console.log('⏭️  场景包还未加载，跳过');
+      return;
+    }
 
     if (!selectedScenePackId) {
       console.log('⏭️  没有selectedScenePackId，跳过');
       return;
     }
 
-    const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
+    // 从数据库加载的场景包中查找（UUID格式）
+    const pack = scenePacks.find(p => p.id === selectedScenePackId);
     if (!pack) {
-      console.warn('⚠️  未找到场景包:', selectedScenePackId);
+      console.warn('⚠️  未找到场景包（UUID）:', selectedScenePackId);
+      console.log('📋 可用场景包IDs:', scenePacks.map(p => p.id));
       return;
     }
 
@@ -54,7 +92,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
     }
 
     // 自动填充第一个示例作为默认提示词
-    const defaultPrompt = pack.examples[0] || '';
+    const defaultPrompt = pack.examples?.[0] || pack.base_prompt || '';
     console.log('📝 设置默认提示词:', defaultPrompt);
     setQuickPrompt(defaultPrompt);
 
@@ -64,15 +102,15 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
     } else {
       console.warn('⚠️  onPromptChange未定义！');
     }
-  }, [selectedScenePackId]); // 只依赖selectedScenePackId
+  }, [selectedScenePackId, scenePacks, isLoading]); // 依赖selectedScenePackId和场景包加载状态
 
   // 处理场景包选择
-  const handleSelectPack = (pack: ScenePack) => {
+  const handleSelectPack = (pack: SceneTemplate) => {
     setSelectedPack(pack);
     applyScenePack(pack);
     onPackSelected?.(pack);
     // 自动填充第一个示例作为默认提示词
-    const defaultPrompt = pack.examples[0] || '';
+    const defaultPrompt = pack.examples?.[0] || pack.base_prompt || '';
     setQuickPrompt(defaultPrompt);
     onPromptChange?.(defaultPrompt);
   };
@@ -83,23 +121,23 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
     onPromptChange?.(value); // 通知父组件
   };
 
-  // 应用场景包配置
-  const applyScenePack = (pack: ScenePack) => {
+  // 应用场景包配置（适配数据库字段名）
+  const applyScenePack = (pack: SceneTemplate) => {
     // 1. 更新模型和基础配置
     updateConfig({
-      model: pack.recommendedModel,
-      aspectRatio: pack.recommendedAspectRatio,
-      numInferenceSteps: pack.recommendedSteps || 4,
+      model: pack.recommended_model || 'flux-schnell',
+      aspectRatio: pack.recommended_aspect_ratio || '1:1',
+      numInferenceSteps: pack.recommended_steps || 4,
       // 保存场景包ID用于后续追踪
       scenePackId: pack.id,
-      // 保存标签配置
-      selectedTags: pack.tags,
+      // 保存标签配置（suggested_tags是JSONB对象）
+      selectedTags: pack.suggested_tags || {},
     });
 
     // 2. 记录使用情况（用于统计和推荐）
     trackScenePackUsage(pack.id);
 
-    console.log('✅ 场景包已应用:', pack.name, pack.tags);
+    console.log('✅ 场景包已应用:', pack.name, pack.suggested_tags);
   };
 
   // 追踪场景包使用
@@ -112,10 +150,10 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
     }
   };
 
-  // 过滤场景包
+  // 过滤场景包（从数据库加载的列表）
   const filteredPacks = filterCategory === 'all'
-    ? SCENE_PACKS
-    : SCENE_PACKS.filter(pack => pack.category === filterCategory);
+    ? scenePacks
+    : scenePacks.filter(pack => pack.category === filterCategory);
 
   // 分类选项
   const categories = [
@@ -173,20 +211,30 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
         </div>
       </div>
 
+      {/* 加载状态 */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <p className="text-gray-600 mt-4">加载场景包中...</p>
+        </div>
+      )}
+
       {/* 场景包网格 */}
-      <div className="scene-pack-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredPacks.map(pack => (
-          <ScenePackCard
-            key={pack.id}
-            pack={pack}
-            isSelected={selectedPack?.id === pack.id}
-            onSelect={() => handleSelectPack(pack)}
-          />
-        ))}
-      </div>
+      {!isLoading && (
+        <div className="scene-pack-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredPacks.map(pack => (
+            <ScenePackCard
+              key={pack.id}
+              pack={pack}
+              isSelected={selectedPack?.id === pack.id}
+              onSelect={() => handleSelectPack(pack)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* 无结果提示 */}
-      {filteredPacks.length === 0 && (
+      {!isLoading && filteredPacks.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <p className="text-lg">暂无该分类的场景包</p>
           <p className="text-sm mt-2">试试其他分类或使用全部场景</p>
@@ -197,15 +245,17 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
       {selectedPack && (
         <div className="selected-pack-info mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
           <div className="flex items-start gap-4 mb-4">
-            <span className="text-4xl">{selectedPack.icon}</span>
+            <span className="text-4xl">{selectedPack.icon || '🎨'}</span>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-semibold text-gray-900 text-lg">
                   {selectedPack.name}
                 </h4>
-                <span className="text-sm text-gray-500">
-                  ({selectedPack.nameEn})
-                </span>
+                {selectedPack.name_en && (
+                  <span className="text-sm text-gray-500">
+                    ({selectedPack.name_en})
+                  </span>
+                )}
               </div>
               <p className="text-sm text-gray-600">{selectedPack.description}</p>
             </div>
@@ -216,19 +266,19 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
             <div className="bg-white rounded-lg px-3 py-2 text-sm">
               <div className="text-gray-500 text-xs mb-1">推荐模型</div>
               <div className="font-medium text-gray-900">
-                {selectedPack.recommendedModel}
+                {selectedPack.recommended_model || 'flux-schnell'}
               </div>
             </div>
             <div className="bg-white rounded-lg px-3 py-2 text-sm">
               <div className="text-gray-500 text-xs mb-1">宽高比</div>
               <div className="font-medium text-gray-900">
-                {selectedPack.recommendedAspectRatio}
+                {selectedPack.recommended_aspect_ratio || '1:1'}
               </div>
             </div>
             <div className="bg-white rounded-lg px-3 py-2 text-sm">
               <div className="text-gray-500 text-xs mb-1">推荐步数</div>
               <div className="font-medium text-gray-900">
-                {selectedPack.recommendedSteps || 4} 步
+                {selectedPack.recommended_steps || 4} 步
               </div>
             </div>
             <div className="bg-white rounded-lg px-3 py-2 text-sm">
@@ -251,21 +301,27 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
               <span>💡</span>
               <span>试试这些描述：</span>
             </p>
-            <ul className="text-sm text-gray-700 space-y-2">
-              {selectedPack.examples.map((example, i) => (
-                <li
-                  key={i}
-                  className="pl-4 py-1 hover:bg-gray-50 rounded cursor-pointer transition-colors"
-                  onClick={() => {
-                    // 点击示例可以复制到剪贴板
-                    navigator.clipboard.writeText(example);
-                  }}
-                  title="点击复制"
-                >
-                  • {example}
-                </li>
-              ))}
-            </ul>
+            {selectedPack.examples && selectedPack.examples.length > 0 ? (
+              <ul className="text-sm text-gray-700 space-y-2">
+                {selectedPack.examples.map((example, i) => (
+                  <li
+                    key={i}
+                    className="pl-4 py-1 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                    onClick={() => {
+                      // 点击示例可以复制到剪贴板
+                      navigator.clipboard.writeText(example);
+                    }}
+                    title="点击复制"
+                  >
+                    • {example}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">
+                {selectedPack.base_prompt || '暂无示例'}
+              </p>
+            )}
 
             {/* 使用提示 */}
             {selectedPack.tips && (
