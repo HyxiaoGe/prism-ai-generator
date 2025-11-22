@@ -36,7 +36,8 @@ function App() {
     loadMoreHistory,
     resetPagination,
     prepareRegeneration,
-    resetGeneration
+    resetGeneration,
+    clearHistory
   } = useAIGenerationStore();
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<'home' | 'gallery' | 'create'>('home');
@@ -233,6 +234,16 @@ function App() {
   const handleNavigationChange = (newMode: 'home' | 'gallery') => {
     setViewMode(newMode);
     setShowSettings(false); // 切换页面时关闭设置面板
+  };
+
+  // 处理关闭设置面板
+  const handleCloseSettings = () => {
+    // 如果当前生成已完成，清空生成历史，避免下次打开时显示旧结果
+    if (currentGeneration.stage === 'completed' && !currentGeneration.isGenerating) {
+      resetGeneration();
+      clearHistory();
+    }
+    setShowSettings(false);
   };
 
   // 处理批次重新生成
@@ -539,7 +550,7 @@ function App() {
       {showSettings && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => !currentGeneration.isGenerating && setShowSettings(false)}
+          onClick={() => !currentGeneration.isGenerating && handleCloseSettings()}
         >
           <div
             className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] transform transition-all duration-300 scale-100 flex flex-col relative"
@@ -549,7 +560,7 @@ function App() {
             <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-xl font-bold text-gray-900">AI图像生成</h2>
               <button
-                onClick={() => setShowSettings(false)}
+                onClick={handleCloseSettings}
                 disabled={currentGeneration.isGenerating}
                 className={`p-2 rounded-xl transition-colors ${
                   currentGeneration.isGenerating
