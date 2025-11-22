@@ -31,6 +31,10 @@ export interface PaginationResult<T> {
 export class GenerationRepository extends BaseRepository {
   private static instance: GenerationRepository;
 
+  // count查询缓存 - 键为userId，值为{count, timestamp}
+  private countCache = new Map<string, { count: number; timestamp: number }>();
+  private readonly COUNT_CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
   private constructor() {
     super();
   }
@@ -40,6 +44,48 @@ export class GenerationRepository extends BaseRepository {
       GenerationRepository.instance = new GenerationRepository();
     }
     return GenerationRepository.instance;
+  }
+
+  /**
+   * 使缓存失效（当有新记录保存时调用）
+   */
+  private invalidateCountCache(userId: string): void {
+    this.countCache.delete(userId);
+    console.log(`🗑️  已清除用户 ${userId} 的count缓存`);
+  }
+
+  /**
+   * 获取缓存的count或从数据库查询
+   */
+  private async getCountWithCache(userId: string): Promise<number> {
+    const cacheKey = userId;
+    const cached = this.countCache.get(cacheKey);
+    const now = Date.now();
+
+    // 检查缓存是否有效
+    if (cached && (now - cached.timestamp) < this.COUNT_CACHE_DURATION) {
+      console.log(`✅ 使用缓存的count: ${cached.count} (剩余${Math.floor((this.COUNT_CACHE_DURATION - (now - cached.timestamp)) / 1000)}秒)`);
+      return cached.count;
+    }
+
+    // 缓存失效或不存在，查询数据库
+    console.log('🔄 缓存失效或不存在，查询数据库count...');
+    const { count, error } = await this.supabase
+      .from('generations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (error) {
+      throw new Error(`获取总数失败: ${error.message}`);
+    }
+
+    const totalCount = count || 0;
+
+    // 更新缓存
+    this.countCache.set(cacheKey, { count: totalCount, timestamp: now });
+    console.log(`💾 已缓存count: ${totalCount}`);
+
+    return totalCount;
   }
 
   /**
@@ -68,6 +114,9 @@ export class GenerationRepository extends BaseRepository {
       throw new Error(`保存生成记录失败: ${error.message}`);
     }
 
+    // 保存成功后使缓存失效
+    this.invalidateCountCache(params.userId);
+
     return data;
   }
 
@@ -94,7 +143,7 @@ export class GenerationRepository extends BaseRepository {
   }
 
   /**
-   * 分页获取用户生成历史
+   * 分页获取用户生成历史 - 使用count缓存优化
    */
   async findByUserIdWithPagination(
     userId: string,
@@ -104,17 +153,8 @@ export class GenerationRepository extends BaseRepository {
     const page = options.page || 1;
     const offset = options.offset !== undefined ? options.offset : (page - 1) * limit;
 
-    // 获取总数
-    const { count, error: countError } = await this.supabase
-      .from('generations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    if (countError) {
-      throw new Error(`获取总数失败: ${countError.message}`);
-    }
-
-    const total = count || 0;
+    // 使用缓存获取总数（优化性能）
+    const total = await this.getCountWithCache(userId);
     const totalPages = Math.ceil(total / limit);
     const hasMore = page < totalPages;
 
