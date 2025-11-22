@@ -10,6 +10,7 @@
 
 import { SCENE_PACKS, type ScenePack } from '@/constants/scenePacks';
 import { SceneTemplateService } from './sceneTemplateService';
+import { ConfigService } from './configService';
 import { tagMappingService, type TagExpansionResult } from './tagMappingService';
 import { supabase } from '@/config/supabase';
 import type { SceneTemplate } from '@/types/database';
@@ -91,7 +92,7 @@ export class ScenePackIntegrationService {
   /**
    * 应用硬编码场景包
    */
-  private applyScenePack(scenePack: ScenePack): ScenePackApplicationResult {
+  private async applyScenePack(scenePack: ScenePack): Promise<ScenePackApplicationResult> {
     console.log('📦 应用场景包:', scenePack.name, scenePack.id);
 
     // 1. 获取基础提示词（使用第一个示例）
@@ -111,7 +112,7 @@ export class ScenePackIntegrationService {
       prompt: fullPrompt,
       model: scenePack.recommendedModel,
       aspectRatio: scenePack.recommendedAspectRatio,
-      numInferenceSteps: scenePack.recommendedSteps || this.getDefaultSteps(scenePack.recommendedModel),
+      numInferenceSteps: scenePack.recommendedSteps || await this.getDefaultSteps(scenePack.recommendedModel),
       outputFormat: 'webp', // 默认格式
       numOutputs: 4,        // 默认数量
 
@@ -193,14 +194,24 @@ export class ScenePackIntegrationService {
 
   /**
    * 根据模型获取默认步数
+   * 优先从模型配置中获取，fallback 到默认值
    */
-  private getDefaultSteps(modelId: string): number {
-    const stepsMap: Record<string, number> = {
-      'flux-schnell': 4,
-      'sdxl-lightning': 4,
-      'stable-diffusion-xl': 20,
-    };
-    return stepsMap[modelId] || 4;
+  private async getDefaultSteps(modelId: string): Promise<number> {
+    try {
+      // 从 ConfigService 动态获取模型配置
+      const model = await ConfigService.getInstance().getAIModelById(modelId);
+      if (model?.default_config?.numInferenceSteps) {
+        return model.default_config.numInferenceSteps;
+      }
+    } catch (error) {
+      console.warn(`获取模型 ${modelId} 的默认步数失败，使用 fallback 值`, error);
+    }
+
+    // Fallback: 根据模型类型返回合理的默认值
+    if (modelId.includes('schnell') || modelId.includes('lightning')) {
+      return 4;  // 快速模型
+    }
+    return 28;  // 其他模型默认值
   }
 
   // ============================================
