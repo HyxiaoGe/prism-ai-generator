@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Zap, History, Plus, Search, Grid, Image, Home } from 'lucide-react';
 import {
   PromptInput,
@@ -45,10 +45,15 @@ function App() {
   const [sidebarPrompt, setSidebarPrompt] = useState(''); // 专门用于右侧栏的提示词
   const [suggestedTags, setSuggestedTags] = useState<any>(null); // 推荐的标签组合
   const [galleryLoaded, setGalleryLoaded] = useState(false); // 标记画廊数据是否已加载
+  const [galleryError, setGalleryError] = useState<string | null>(null); // 画廊加载错误状态
+  const [isGalleryLoading, setIsGalleryLoading] = useState(false); // 画廊独立加载状态
   const [currentPrompt, setCurrentPrompt] = useState(''); // 当前输入的提示词（用于统一生成按钮）
   const [isProcessing, setIsProcessing] = useState(false); // AI处理状态（分析、优化等）
   const [selectedScenePackId, setSelectedScenePackId] = useState<string | null>(null); // 从首页选中的场景包ID
   const [currentTab, setCurrentTab] = useState<'model' | 'prompt' | 'advanced'>('model'); // 当前tab
+
+  // 用于取消画廊加载请求的AbortController
+  const galleryAbortControllerRef = useRef<AbortController | null>(null);
 
   // Toast 通知系统
   const toast = useToast();
@@ -124,24 +129,69 @@ function App() {
   // 懒加载画廊数据 - 只有切换到画廊视图时才加载
   useEffect(() => {
     // 只有在画廊视图且未加载过数据时才加载
-    // 使用isLoading防止在加载过程中重复触发
-    if (viewMode !== 'gallery' || galleryLoaded || authLoading || !appUser || isLoading) {
+    // 移除了isLoading依赖，使用独立的isGalleryLoading状态
+    if (viewMode !== 'gallery' || galleryLoaded || authLoading || !appUser || isGalleryLoading) {
       return;
     }
 
+    // 使用cancelled标志防止组件卸载后的状态更新
+    let cancelled = false;
+
     const loadGalleryData = async () => {
+      // 取消之前的请求（如果存在）
+      if (galleryAbortControllerRef.current) {
+        galleryAbortControllerRef.current.abort();
+      }
+
+      // 创建新的AbortController
+      galleryAbortControllerRef.current = new AbortController();
+
+      if (cancelled) return;
+
+      setIsGalleryLoading(true);
+      setGalleryError(null); // 清除之前的错误
+
       try {
+        console.log('🔄 开始加载画廊数据...');
         await loadHistoryWithPagination(1, true);
-        setGalleryLoaded(true);
-      } catch (error) {
-        console.error('❌ 画廊数据加载失败:', error);
-        toast.error('画廊加载失败', '请检查网络连接后重试');
+
+        if (!cancelled) {
+          setGalleryLoaded(true);
+          setGalleryError(null);
+          console.log('✅ 画廊数据加载成功');
+        }
+      } catch (error: any) {
+        // 如果是请求被取消，不显示错误
+        if (error.name === 'AbortError') {
+          console.log('🚫 画廊加载请求已取消');
+          return;
+        }
+
+        if (!cancelled) {
+          const errorMessage = error?.message || '未知错误';
+          console.error('❌ 画廊数据加载失败:', errorMessage);
+          setGalleryError(errorMessage);
+          // 不设置galleryLoaded，允许用户重试
+          toast.error('画廊加载失败', '请检查网络连接后重试');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsGalleryLoading(false);
+        }
       }
     };
 
     loadGalleryData();
+
+    // 清理函数：组件卸载或依赖变化时取消请求
+    return () => {
+      cancelled = true;
+      if (galleryAbortControllerRef.current) {
+        galleryAbortControllerRef.current.abort();
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, galleryLoaded, authLoading, appUser?.id, isLoading]);
+  }, [viewMode, galleryLoaded, authLoading, appUser?.id]);
 
   // 监听生成完成，重置画廊加载状态
   useEffect(() => {
@@ -465,7 +515,7 @@ function App() {
             </div>
 
             {/* 画廊加载状态 */}
-            {isLoading ? (
+            {isGalleryLoading ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
                   <Zap className="w-8 h-8 text-white" />
@@ -475,6 +525,28 @@ function App() {
                 <div className="mt-4 w-32 h-1 bg-gray-200 rounded-full mx-auto overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
                 </div>
+              </div>
+            ) : galleryError ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">加载失败</h3>
+                <p className="text-gray-600 mb-6">{galleryError}</p>
+                <button
+                  onClick={() => {
+                    setGalleryLoaded(false);
+                    setGalleryError(null);
+                  }}
+                  className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>重新加载</span>
+                </button>
               </div>
             ) : generationBatches.length > 0 ? (
               <>

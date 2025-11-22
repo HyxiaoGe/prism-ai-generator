@@ -155,62 +155,49 @@ export function TemplateShowcase({
     };
   }, [isAutoScrolling, isPaused, featuredTemplates]);
 
-  // 加载模板数据
+  // 加载模板数据 - 优化版：只加载当前tab需要的数据
   const loadTemplates = async () => {
     setLoading(true);
     try {
-      // 并行加载所有数据
-      const [categoriesData, popularTemplates, topRatedTemplates, latestTemplates] = await Promise.all([
+      // 第一步：只加载必要的初始数据（分类信息 + 当前激活tab的模板）
+      console.log('🚀 优化加载：只加载当前tab数据，减少初始请求');
+      const [categoriesData, currentTabTemplates] = await Promise.all([
         templateService.getCategories(),
-        templateService.getPopularTemplates(DEFAULT_LIMITS.FEATURED),
-        templateService.getTopRatedTemplates(DEFAULT_LIMITS.FEATURED),
-        templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED),
+        // 根据当前激活的tab只加载对应数据
+        activeTab === 'popular'
+          ? templateService.getPopularTemplates(DEFAULT_LIMITS.FEATURED)
+          : activeTab === 'rating'
+          ? templateService.getTopRatedTemplates(DEFAULT_LIMITS.FEATURED)
+          : templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED),
       ]);
 
-      console.log('加载的模板数据:', {
-        popular: popularTemplates.length,
-        rating: topRatedTemplates.length,
-        newest: latestTemplates.length,
-        popularIds: popularTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, usage: t.usage_count })),
-        ratingIds: topRatedTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, rating: t.rating })),
-        newestIds: latestTemplates.slice(0, 3).map(t => ({ id: t.id, name: t.name, created: t.created_at })),
+      console.log('✅ 初始数据加载完成:', {
+        activeTab,
+        templates: currentTabTemplates.length,
       });
 
       // 设置分类数据
       setCategories(categoriesData);
 
-      // 缓存所有三种排序的数据
-      setCachedTemplates({
-        popular: popularTemplates,
-        rating: topRatedTemplates,
-        newest: latestTemplates,
-      });
+      // 缓存当前tab的数据
+      setCachedTemplates(prev => ({
+        ...prev,
+        [activeTab]: currentTabTemplates,
+      }));
 
-      // 根据当前tab设置热门推荐
-      switch (activeTab) {
-        case 'popular':
-          setFeaturedTemplates(popularTemplates);
-          break;
-        case 'rating':
-          setFeaturedTemplates(topRatedTemplates);
-          break;
-        case 'newest':
-          setFeaturedTemplates(latestTemplates);
-          break;
-      }
+      // 设置热门推荐
+      setFeaturedTemplates(currentTabTemplates);
 
-      // 按分类加载模板
+      // 第二步：按分类加载模板（保持现有逻辑）
       const categoryTemplatesMap = await loadCategorizedTemplates(categoriesData);
 
-      // 批量查询所有模板的收藏状态（包括精选推荐和分类模板，一次性查询）
+      // 第三步：批量查询收藏状态（只查询已加载的模板）
       const allTemplateIds = new Set<string>();
 
-      // 添加精选推荐的模板 ID
-      popularTemplates.forEach(t => allTemplateIds.add(t.id));
-      topRatedTemplates.forEach(t => allTemplateIds.add(t.id));
-      latestTemplates.forEach(t => allTemplateIds.add(t.id));
+      // 添加当前tab的模板 ID
+      currentTabTemplates.forEach(t => allTemplateIds.add(t.id));
 
-      // 添加所有分类模板的 ID
+      // 添加分类模板的 ID
       categoryTemplatesMap.forEach(templates => {
         templates.forEach(t => allTemplateIds.add(t.id));
       });
@@ -218,6 +205,32 @@ export function TemplateShowcase({
       console.log(`📊 批量查询 ${allTemplateIds.size} 个模板的收藏状态`);
       const favoriteMap = await templateService.getBatchFavoriteStatus(Array.from(allTemplateIds));
       setFavoriteStatusMap(favoriteMap);
+
+      // 第四步：后台预加载其他tab的数据（不阻塞UI）
+      setTimeout(async () => {
+        try {
+          console.log('🔄 后台预加载其他tab数据...');
+          const otherTabsData = await Promise.all([
+            activeTab !== 'popular' ? templateService.getPopularTemplates(DEFAULT_LIMITS.FEATURED) : Promise.resolve([]),
+            activeTab !== 'rating' ? templateService.getTopRatedTemplates(DEFAULT_LIMITS.FEATURED) : Promise.resolve([]),
+            activeTab !== 'newest' ? templateService.getLatestTemplates(DEFAULT_LIMITS.FEATURED) : Promise.resolve([]),
+          ]);
+
+          // 更新缓存
+          const [popularData, ratingData, newestData] = otherTabsData;
+          setCachedTemplates(prev => ({
+            popular: activeTab === 'popular' ? prev.popular : popularData,
+            rating: activeTab === 'rating' ? prev.rating : ratingData,
+            newest: activeTab === 'newest' ? prev.newest : newestData,
+          }));
+
+          console.log('✅ 后台预加载完成');
+        } catch (error) {
+          console.error('后台预加载失败:', error);
+          // 预加载失败不影响用户体验
+        }
+      }, 1000); // 延迟1秒，让首屏渲染更快
+
     } catch (error) {
       console.error('加载模板失败:', error);
     } finally {
