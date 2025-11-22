@@ -355,11 +355,6 @@ export function TemplateShowcase({
     }, 100);
   };
 
-  // 骨架屏
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
-
   // 根据选中分类过滤要显示的分类
   const displayCategories = selectedCategory === 'all'
     ? Array.from(categorizedTemplates.keys())
