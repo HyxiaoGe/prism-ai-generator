@@ -23,23 +23,51 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
 
   // 当从首页选择场景包时，自动选中对应的场景包
   useEffect(() => {
+    console.log('🔍 QuickModePanel useEffect triggered:', {
+      selectedScenePackId,
+      selectedPackId: selectedPack?.id,
+      hasOnPromptChange: !!onPromptChange
+    });
+
     if (selectedScenePackId) {
-      // 如果已经选中了这个场景包，不重复处理
-      if (selectedPack?.id === selectedScenePackId) {
+      const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
+
+      if (!pack) {
+        console.warn('⚠️  未找到场景包:', selectedScenePackId);
         return;
       }
 
-      const pack = SCENE_PACKS.find(p => p.id === selectedScenePackId);
-      if (pack) {
-        // 直接执行选中逻辑，避免依赖handleSelectPack
-        setSelectedPack(pack);
-        applyScenePack(pack);
-        onPackSelected?.(pack);
+      console.log('✅ 找到场景包:', pack.name);
 
-        // 自动填充第一个示例作为默认提示词
+      // 如果场景包没变化，只同步提示词（不重复应用配置）
+      if (selectedPack?.id === selectedScenePackId) {
+        console.log('⏭️  场景包已选中，仅同步提示词');
         const defaultPrompt = pack.examples[0] || '';
         setQuickPrompt(defaultPrompt);
-        onPromptChange?.(defaultPrompt);
+
+        if (onPromptChange) {
+          console.log('📤 同步提示词到父组件');
+          onPromptChange(defaultPrompt);
+        }
+        return;
+      }
+
+      // 场景包变化了，完整应用配置
+      console.log('🔄 场景包变化，完整应用配置');
+      setSelectedPack(pack);
+      applyScenePack(pack);
+      onPackSelected?.(pack);
+
+      // 自动填充第一个示例作为默认提示词
+      const defaultPrompt = pack.examples[0] || '';
+      console.log('📝 设置默认提示词:', defaultPrompt);
+      setQuickPrompt(defaultPrompt);
+
+      if (onPromptChange) {
+        console.log('📤 调用onPromptChange');
+        onPromptChange(defaultPrompt);
+      } else {
+        console.warn('⚠️  onPromptChange未定义！');
       }
     }
   }, [selectedScenePackId, selectedPack?.id, onPackSelected, onPromptChange]);
