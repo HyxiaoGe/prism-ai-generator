@@ -424,28 +424,31 @@ function App() {
 
       {/* 主要内容区域 */}
       <main className="pt-20">
-        
-        {/* 根据视图模式显示不同内容 */}
-        {viewMode === 'home' && (
-          <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in">
-            {/* Hero区域 */}
-            <div className="text-center mb-16">
-              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center">
-                <Zap className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                用AI创造无限可能
-              </h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                从 25+ 专业模板中选择，或输入你的创意想法，让AI为你生成令人惊艳的图像作品
-              </p>
-            </div>
 
-            {/* 新的模板展示组件 */}
-            <TemplateShowcase
-              onSelectTemplate={handleTemplateClick}
-              selectedTemplateId={undefined}
-            />
+        {/* 首页视图 - 使用CSS隐藏而不是卸载，保留组件状态和缓存 */}
+        <div
+          className={`max-w-7xl mx-auto px-6 py-12 ${
+            viewMode === 'home' ? 'block animate-fade-in' : 'hidden'
+          }`}
+        >
+          {/* Hero区域 */}
+          <div className="text-center mb-16">
+            <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center">
+              <Zap className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              用AI创造无限可能
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              从 25+ 专业模板中选择，或输入你的创意想法，让AI为你生成令人惊艳的图像作品
+            </p>
+          </div>
+
+          {/* 新的模板展示组件 */}
+          <TemplateShowcase
+            onSelectTemplate={handleTemplateClick}
+            selectedTemplateId={undefined}
+          />
 
             {/* 用户作品统计（如果有） */}
             {hasContent && (
@@ -473,26 +476,26 @@ function App() {
                 </button>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* 创作模式 - 生成过程中显示 */}
-        {viewMode === 'create' && (
-          <div className="max-w-4xl mx-auto px-6 py-16 animate-fade-in">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                AI正在为您创作中...
+        <div className={`max-w-4xl mx-auto px-6 py-16 ${
+          viewMode === 'create' ? 'block animate-fade-in' : 'hidden'
+        }`}>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              AI正在为您创作中...
               </h2>
             </div>
-            
+
             {/* 生成进度组件 */}
             <LoadingIndicator />
-          </div>
-        )}
+        </div>
 
         {/* 作品画廊模式 */}
-        {viewMode === 'gallery' && (
-          <div className="max-w-7xl mx-auto px-6 py-8 animate-fade-in">
+        <div className={`max-w-7xl mx-auto px-6 py-8 ${
+          viewMode === 'gallery' ? 'block animate-fade-in' : 'hidden'
+        }`}>
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">我的作品画廊</h2>
@@ -614,8 +617,7 @@ function App() {
                 </button>
               </div>
             )}
-          </div>
-        )}
+        </div>
       </main>
 
       {/* 设置面板 */}
