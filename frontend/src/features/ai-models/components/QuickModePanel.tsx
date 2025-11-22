@@ -126,12 +126,19 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
     // 1. 更新模型和基础配置
     updateConfig({
       model: pack.recommended_model || 'flux-schnell',
-      aspectRatio: pack.recommended_aspect_ratio || '1:1',
+      aspectRatio: (pack.recommended_aspect_ratio || '1:1') as '1:1' | '16:9' | '9:16' | '4:3' | '3:4',
       numInferenceSteps: pack.recommended_steps || 4,
       // 保存场景包ID用于后续追踪
       scenePackId: pack.id,
-      // 保存标签配置（suggested_tags是JSONB对象）
-      selectedTags: pack.suggested_tags || {},
+      // 保存标签配置（将数据库的数组格式转换为GenerationConfig期望的格式）
+      selectedTags: pack.suggested_tags ? {
+        artStyle: pack.suggested_tags.art_style?.[0],
+        themeStyle: pack.suggested_tags.theme_style?.[0],
+        mood: pack.suggested_tags.mood?.[0],
+        technical: pack.suggested_tags.technical,
+        composition: pack.suggested_tags.composition,
+        enhancement: pack.suggested_tags.enhancement,
+      } : {},
     });
 
     // 2. 记录使用情况（用于统计和推荐）
@@ -346,7 +353,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
               <textarea
                 value={quickPrompt}
                 onChange={(e) => handlePromptChange(e.target.value)}
-                placeholder={`例如：${selectedPack.examples[0]}`}
+                placeholder={`例如：${selectedPack.examples?.[0] || selectedPack.base_prompt}`}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none"
                 rows={3}
               />
