@@ -1,57 +1,20 @@
 /**
  * Service Worker 注册工具
- * 在生产环境自动注册PWA Service Worker
+ * 【暂时禁用】由于缓存问题导致页面空白，暂时禁用PWA功能
  */
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  // 只在生产环境且浏览器支持Service Worker时注册
-  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    try {
-      console.log('[PWA] 正在注册Service Worker...');
+  // 【紧急修复】完全禁用Service Worker并清理旧缓存
+  console.log('[PWA] Service Worker已禁用，正在清理旧缓存...');
 
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-      });
+  // 卸载所有Service Worker
+  await unregisterServiceWorker();
 
-      console.log('[PWA] Service Worker注册成功:', registration.scope);
+  // 清除所有缓存
+  await clearAllCaches();
 
-      // 监听更新
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // 新版本可用
-              console.log('[PWA] 检测到新版本，正在更新...');
-
-              // 可以在这里显示更新提示
-              if (confirm('检测到新版本，是否立即更新？')) {
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
-                window.location.reload();
-              }
-            }
-          });
-        }
-      });
-
-      // 监听控制权变化
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('[PWA] Service Worker控制权已更新');
-      });
-
-      return registration;
-    } catch (error) {
-      console.error('[PWA] Service Worker注册失败:', error);
-      return null;
-    }
-  } else {
-    if (!import.meta.env.PROD) {
-      console.log('[PWA] 开发环境，跳过Service Worker注册');
-    } else {
-      console.warn('[PWA] 浏览器不支持Service Worker');
-    }
-    return null;
-  }
+  console.log('[PWA] 清理完成，Service Worker已禁用');
+  return null;
 }
 
 /**
