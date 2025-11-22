@@ -13,6 +13,7 @@ interface SettingsTabsProps {
   onProcessingChange?: (isProcessing: boolean) => void; // 处理状态变化回调
   selectedScenePackId?: string | null; // 从首页选中的场景包ID
   onTabChange?: (tab: TabId) => void; // tab切换回调
+  activeTab?: TabId; // 外部控制当前tab（受控模式）
 }
 
 export type TabId = 'model' | 'prompt' | 'advanced';
@@ -31,14 +32,29 @@ export function SettingsTabs({
   onPromptChange,
   onProcessingChange,
   selectedScenePackId,
-  onTabChange
+  onTabChange,
+  activeTab: controlledActiveTab
 }: SettingsTabsProps) {
-  // 始终从模型配置tab开始，不管是否选择了场景包
-  const [activeTab, setActiveTab] = useState<TabId>('model');
+  // 内部tab状态（如果外部没有传入activeTab，则使用内部状态）
+  const [internalActiveTab, setInternalActiveTab] = useState<TabId>('model');
+
+  // 使用受控或非受控模式
+  const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
+
+  // 当外部activeTab变化时，同步内部状态
+  useEffect(() => {
+    if (controlledActiveTab !== undefined) {
+      setInternalActiveTab(controlledActiveTab);
+    }
+  }, [controlledActiveTab]);
 
   // 处理tab切换
   const handleTabChange = (tab: TabId) => {
-    setActiveTab(tab);
+    // 如果是非受控模式，更新内部状态
+    if (controlledActiveTab === undefined) {
+      setInternalActiveTab(tab);
+    }
+    // 通知外部
     onTabChange?.(tab);
   };
 
