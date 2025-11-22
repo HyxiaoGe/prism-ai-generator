@@ -3,7 +3,7 @@
  * 提供离线访问能力和静态资源缓存
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `prism-ai-${CACHE_VERSION}`;
 
 // 需要缓存的静态资源
@@ -171,6 +171,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // 【关键修复】跳过JavaScript模块请求，避免缓存HTML导致模块加载失败
+  // Vite开发服务器和生产构建的模块都需要跳过Service Worker
+  if (
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.includes('/src/') ||
+    url.includes('/@vite/') ||
+    url.includes('/@fs/') ||
+    url.includes('/node_modules/') ||
+    url.endsWith('.js') ||
+    url.endsWith('.ts') ||
+    url.endsWith('.tsx') ||
+    url.endsWith('.jsx') ||
+    url.endsWith('.css')
+  ) {
+    // 让浏览器直接处理模块脚本和样式，不通过Service Worker
+    return;
+  }
+
+  // 跳过认证相关请求
+  if (url.includes('/auth/') || url.includes('/oauth')) {
+    event.respondWith(networkOnly(request));
+    return;
+  }
+
   // 根据请求类型选择缓存策略
   if (isImageRequest(url)) {
     // 图片：缓存优先
@@ -178,11 +203,8 @@ self.addEventListener('fetch', (event) => {
   } else if (isAPIRequest(url)) {
     // API：网络优先
     event.respondWith(networkFirst(request));
-  } else if (url.includes('/auth/') || url.includes('/oauth')) {
-    // 认证相关：仅网络
-    event.respondWith(networkOnly(request));
   } else {
-    // 其他静态资源：缓存优先
+    // 其他静态资源：缓存优先（但已经排除了JS/CSS模块）
     event.respondWith(cacheFirst(request));
   }
 });
