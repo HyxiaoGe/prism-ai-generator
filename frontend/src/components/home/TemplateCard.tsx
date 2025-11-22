@@ -25,7 +25,8 @@ interface TemplateCardProps {
   onFavoriteChange?: (templateId: string, isFavorited: boolean) => void; // 收藏状态变化回调
 }
 
-export function TemplateCard({
+// 使用React.memo优化组件性能，避免不必要的重新渲染
+export const TemplateCard = React.memo(function TemplateCard({
   template,
   isSelected = false,
   onSelect,
@@ -249,4 +250,13 @@ export function TemplateCard({
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // 自定义比较函数 - 只有这些props变化时才重新渲染
+  return (
+    prevProps.template.id === nextProps.template.id &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.variant === nextProps.variant &&
+    prevProps.showStats === nextProps.showStats &&
+    prevProps.initialFavoriteStatus === nextProps.initialFavoriteStatus
+  );
+});

@@ -12,7 +12,7 @@ import {
 import { useAIGenerationStore } from './store/aiGenerationStore';
 import { useAuthStore } from './store/authStore';
 import { UserMenu } from './components/auth';
-import { ToastContainer } from './components/ui';
+import { ToastContainer, ImageGridSkeleton } from './components/ui';
 import { useToast } from './hooks/useToast';
 import { initializeDebugTools } from './utils/debugDatabase';
 import { TemplateShowcase } from './components/home';
@@ -519,16 +519,7 @@ function App() {
 
             {/* 画廊加载状态 */}
             {isGalleryLoading ? (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
-                  <Zap className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">正在加载中...</h3>
-                <p className="text-gray-600">正在从数据库加载您的作品画廊</p>
-                <div className="mt-4 w-32 h-1 bg-gray-200 rounded-full mx-auto overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
-                </div>
-              </div>
+              <ImageGridSkeleton count={9} />
             ) : galleryError ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">

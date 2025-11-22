@@ -8,6 +8,7 @@ import { Sparkles, Flame, Star, Clock, Search } from 'lucide-react';
 import { TemplateCard } from './TemplateCard';
 import { CategoryNavigation, type CategoryInfo } from './CategoryNavigation';
 import { CategorySection } from './CategorySection';
+import { TemplateShowcaseSkeleton } from '../ui';
 import type { SceneTemplate } from '../../types/database';
 import { SceneTemplateService } from '../../services/business';
 import { DEFAULT_LIMITS } from '../../features/ai-models/constants/templateConfig';
@@ -363,6 +364,11 @@ export function TemplateShowcase({
   const displayCategories = selectedCategory === 'all'
     ? Array.from(categorizedTemplates.keys())
     : [selectedCategory];
+
+  // 显示骨架屏
+  if (loading) {
+    return <TemplateShowcaseSkeleton />;
+  }
 
   return (
     <div className="space-y-12 animate-fade-in">
