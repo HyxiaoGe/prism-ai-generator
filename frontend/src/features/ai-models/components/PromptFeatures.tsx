@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { GenerationResult } from '../../../types';
 
-// AI模型信息
+// AI模型信息 - 与数据库模型ID匹配
 const getModelInfo = (model: string) => {
   const modelMap: Record<string, { label: string; icon: string; color: string }> = {
-    'black-forest-labs/flux-schnell': { label: 'FLUX Schnell', icon: '⚡', color: 'blue' },
-    'stability-ai/stable-diffusion-3-medium': { label: 'Stable Diffusion 3', icon: '🎨', color: 'purple' },
-    'imagen-v3-ultra': { label: 'Imagen V3 Ultra', icon: '🎯', color: 'green' },
+    'flux-schnell': { label: 'Flux Schnell', icon: '⚡', color: 'blue' },
+    'imagen-4-ultra': { label: 'Imagen 4 Ultra', icon: '🚀', color: 'green' },
+    'nano-banana': { label: 'Nano Banana', icon: '🍌', color: 'yellow' },
   };
   return modelMap[model] || { label: '未知模型', icon: '🤖', color: 'gray' };
 };

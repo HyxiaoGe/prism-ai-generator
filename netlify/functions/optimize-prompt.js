@@ -177,16 +177,12 @@ function getModelCharacteristics(targetModel, language = 'zh') {
       en: 'Ultra-fast 4-step generation model, excels at quick generation, suitable for concise and clear prompts, avoid overly complex descriptions'
     },
     'imagen-4-ultra': {
-      zh: 'Google高质量模型，擅长真实感图像，支持详细的自然语言描述，对光影效果理解出色',  
+      zh: 'Google高质量模型，擅长真实感图像，支持详细的自然语言描述，对光影效果理解出色',
       en: 'Google high-quality model, excels at photorealistic images, supports detailed natural language descriptions, excellent understanding of lighting effects'
     },
-    'sdxl-lightning-4step': {
-      zh: 'ByteDance闪电模型，平衡速度和质量，适合艺术风格和创意表达',
-      en: 'ByteDance lightning model, balances speed and quality, suitable for artistic styles and creative expression'
-    },
-    'stable-diffusion': {
-      zh: '经典SDXL模型，成熟稳定，支持丰富的风格词汇，适合添加负面提示词',
-      en: 'Classic SDXL model, mature and stable, supports rich style vocabulary, suitable for negative prompts'
+    'nano-banana': {
+      zh: 'Google Gemini 2.5 Flash Image模型，速度快2-3倍，擅长快速迭代和创意工作流，支持多种分辨率和宽高比',
+      en: 'Google Gemini 2.5 Flash Image model, 2-3x faster, excels at quick iteration and creative workflows, supports multiple resolutions and aspect ratios'
     }
   };
 
@@ -194,7 +190,7 @@ function getModelCharacteristics(targetModel, language = 'zh') {
   if (!modelChar) {
     return language === 'zh' ? '通用AI图像生成模型，支持多种风格和主题' : 'Universal AI image generation model, supports various styles and themes';
   }
-  
+
   return modelChar[language] || modelChar.zh;
 }
 

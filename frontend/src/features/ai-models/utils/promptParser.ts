@@ -91,14 +91,11 @@ const ENHANCEMENT_MAP = new Map([
   ['film grain, analog photography, vintage film look, organic texture', { label: '胶片质感效果', icon: '📼', color: 'amber' }],
 ]);
 
-// 模型标签映射 - 完整版本
+// 模型标签映射 - 仅包含当前启用的模型
 const MODEL_MAP = new Map([
   ['flux-schnell', { label: 'Flux快速', icon: '⚡', color: 'blue' }],
-  ['sdxl-lightning', { label: 'SDXL闪电', icon: '🌩️', color: 'yellow' }],
-  ['sdxl-lightning-4step', { label: 'SDXL闪电4步', icon: '🌩️', color: 'yellow' }],
-  ['stable-diffusion-xl', { label: 'SDXL经典', icon: '🏛️', color: 'gray' }],
-  ['stable-diffusion', { label: 'SD经典', icon: '🎨', color: 'gray' }],
   ['imagen-4-ultra', { label: 'Imagen-4', icon: '🚀', color: 'green' }],
+  ['nano-banana', { label: 'Nano Banana', icon: '🍌', color: 'yellow' }],
 ]);
 
 /**
