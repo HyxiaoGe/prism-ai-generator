@@ -24,7 +24,7 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
   const [scenePacks, setScenePacks] = useState<SceneTemplate[]>([]); // 从数据库加载的场景包
   const [isLoading, setIsLoading] = useState(true); // 加载状态
 
-  const { updateConfig } = useAIGenerationStore();
+  const { updateConfig, resetGeneration } = useAIGenerationStore();
   const sceneTemplateService = SceneTemplateService.getInstance();
 
   // 从数据库加载官方场景包
@@ -106,6 +106,9 @@ export function QuickModePanel({ onPackSelected, onPromptChange, selectedScenePa
 
   // 处理场景包选择
   const handleSelectPack = (pack: SceneTemplate) => {
+    // 清空之前的生成结果，开始新的创作
+    resetGeneration();
+
     setSelectedPack(pack);
     applyScenePack(pack);
     onPackSelected?.(pack);
