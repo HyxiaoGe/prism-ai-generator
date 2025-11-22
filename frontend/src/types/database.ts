@@ -72,6 +72,8 @@ export type TemplateStatus = 'active' | 'draft' | 'archived';
 export interface SceneTemplate {
   id: string;
   name: string;                       // 模板名称
+  name_en?: string;                   // 英文名称（用于国际化）
+  icon?: string;                      // 图标（emoji或图标名称）
   description?: string;               // 模板描述
   category: string;                   // 主分类（如：portrait, landscape, product等）
   subcategory?: string;               // 子分类
@@ -88,6 +90,13 @@ export interface SceneTemplate {
   };
   thumbnail_url?: string;             // 缩略图URL
   example_images: string[];           // 示例图片URL数组
+  examples?: string[];                // 示例描述数组
+  tips?: string;                      // 使用提示
+  recommended_model?: string;         // 推荐AI模型
+  recommended_aspect_ratio?: string;  // 推荐宽高比
+  recommended_steps?: number;         // 推荐推理步数
+  recommended_output_format?: string; // 推荐输出格式
+  recommended_num_outputs?: number;   // 推荐输出数量
   usage_count: number;                // 使用次数
   rating: number;                     // 平均评分（0-5）
   likes_count: number;                // 点赞数
